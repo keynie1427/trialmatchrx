@@ -1,3 +1,64 @@
-node_modules
-.next
+# =========================================
+# 🚀 TrialMatchRX .gitignore
+# Optimized for Next.js + Firebase projects
+# =========================================
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Next.js build output ---
+.next/
+out/
+dist/
+.next.cache/
+.vercel/
+*.log
+
+# --- Local environment variables ---
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Firebase build cache ---
+.firebase/
+.firebaserc
+firebase-debug.log
+firebase-debug.*
+.firebase-analytics-debug.log
+
+# --- OS / Editor junk ---
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Coverage / testing ---
+coverage/
+*.lcov
+
+# --- Miscellaneous ---
+*.bak
+*.tmp
+*.temp
+*.old
+*.log
+
+# --- Lock files (optional: keep one of these) ---
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# --- Typescript build artifacts ---
+*.tsbuildinfo
+
+# --- Optional local test assets ---
+uploads/
+screenshots/
+*.sqlite3
