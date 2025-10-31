@@ -12,8 +12,42 @@
       "dest": "/api/$1"
     },
     {
+      "src": "/trial/(.*)",
+      "dest": "/trial/$1"
+    },
+    {
+      "src": "/evidence/(.*)",
+      "dest": "/evidence/$1"
+    },
+    {
+      "src": "/",
+      "dest": "/search"
+    },
+    {
+      "src": "/results",
+      "status": 301,
+      "headers": { "Location": "/search" }
+    },
+    {
+      "src": "/back",
+      "status": 302,
+      "headers": { "Location": "/search" }
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/results",
+      "destination": "/search",
+      "permanent": false
+    },
+    {
+      "source": "/back",
+      "destination": "/search",
+      "permanent": false
     }
   ],
   "env": {
@@ -35,7 +69,8 @@
         { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "geolocation=(self)" }
+        { "key": "Permissions-Policy", "value": "geolocation=(self)" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
       ]
     }
   ],
