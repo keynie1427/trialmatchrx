@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="trialmatchrx-starter">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/trialmatchrx-starter.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
