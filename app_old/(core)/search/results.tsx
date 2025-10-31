@@ -1,4 +1,4 @@
-import { TrialCard } from "@/components/trial-card";
+import { TrialCard } from "@/components/TrialCard";
 import { getTrials } from "@/lib/ctgov";
 import { headers } from "next/headers";
 
