@@ -1,7 +1,8 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import React from "react";
+import Header from "../../components/Header";
+import Footer from "../../components/Footer";
+import BackToTop from "../../components/BackToTop";
 
 // 🧩 Try to dynamically import optional components
 const Header = dynamic(() => import("@/components/Header").catch(() => () => null), { ssr: false });
