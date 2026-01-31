@@ -147,10 +147,10 @@ export async function createUser(uid: string, email: string, displayName?: strin
 
 export async function updateUserProfile(uid: string, profile: PatientProfile): Promise<void> {
   const docRef = doc(db, COLLECTIONS.USERS, uid);
-  await updateDoc(docRef, {
+  await setDoc(docRef, {
     profile,
     updatedAt: Timestamp.now(),
-  });
+  }, { merge: true });
 }
 
 export async function saveTrialToUser(uid: string, nctId: string): Promise<void> {
