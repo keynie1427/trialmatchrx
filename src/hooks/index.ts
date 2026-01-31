@@ -50,7 +50,7 @@ export function useAuth() {
                 firebaseUser.displayName || undefined
               );
             }
-            if (userData) {
+            if (userData) { if (userData.profile) { setProfile(userData.profile); }
               setUser(userData);
             }
           } catch (err) {
