@@ -303,7 +303,7 @@ function transformStudyToTrial(study: any): Trial | null {
       title: id.briefTitle,
       briefTitle: id.briefTitle,
       officialTitle: id.officialTitle,
-      status: mapStatus(status.overallStatus),
+      status: mapStatus(status.overallStatus) as any,
       lastUpdateDate: status.lastUpdateSubmitDate || new Date().toISOString(),
       phase: mapPhase(design.phases?.[0]),
       studyType: 'Interventional',
