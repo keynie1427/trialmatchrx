@@ -55,14 +55,14 @@ export default function ProfilePage() {
 
   // Load existing profile data
   useEffect(() => {
-    if (user) {
+    if (user) { console.log("USER DATA:", user);
       setFormData(prev => ({
         ...prev,
         displayName: user.displayName || '',
         email: user.email || '',
       }));
     }
-    if (profile) {
+    if (profile) { console.log("PROFILE DATA:", profile);
       setFormData(prev => ({
         ...prev,
         email: user?.email || prev.email, displayName: profile.displayName || prev.displayName, cancerType: profile.cancerType || '',
