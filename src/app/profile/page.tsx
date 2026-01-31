@@ -85,7 +85,7 @@ export default function ProfilePage() {
     setSaveSuccess(false);
 
     try {
-      await saveProfile({
+      await saveProfile({ willingToTravel: true, preferredPhases: [], excludePhase1: false,
         cancerType: formData.cancerType,
         cancerSubtype: formData.cancerSubtype,
         stage: formData.stage as any,
