@@ -65,7 +65,7 @@ export default function ProfilePage() {
     if (profile) {
       setFormData(prev => ({
         ...prev,
-        email: prev.email, displayName: profile.displayName || prev.displayName, cancerType: profile.cancerType || '',
+        email: user?.email || prev.email, displayName: profile.displayName || prev.displayName, cancerType: profile.cancerType || '',
         cancerSubtype: profile.cancerSubtype || '',
         stage: profile.stage || '',
         biomarkers: profile.biomarkers || [],
