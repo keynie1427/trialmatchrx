@@ -88,7 +88,7 @@ export default function ProfilePage() {
       await saveProfile({
         cancerType: formData.cancerType,
         cancerSubtype: formData.cancerSubtype,
-        stage: formData.stage,
+        stage: formData.stage as any,
         biomarkers: formData.biomarkers,
         priorTreatments: formData.priorTreatments.map(t => ({ treatment: t, type: 'other' })),
         treatmentNaive: formData.treatmentNaive,
