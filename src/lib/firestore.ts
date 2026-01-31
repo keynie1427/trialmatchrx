@@ -145,12 +145,12 @@ export async function createUser(uid: string, email: string, displayName?: strin
   return user;
 }
 
-export async function updateUserProfile(uid: string, profile: PatientProfile): Promise<void> {
+export async function updateUserProfile(uid: string, profile: PatientProfile): Promise<void> { console.log("FIRESTORE: Starting write for", uid);
   const docRef = doc(db, COLLECTIONS.USERS, uid);
   await setDoc(docRef, {
     profile,
     updatedAt: Timestamp.now(),
-  }, { merge: true });
+  }, { merge: true }); console.log("FIRESTORE: Write complete");
 }
 
 export async function saveTrialToUser(uid: string, nctId: string): Promise<void> {
