@@ -87,7 +87,7 @@ export default function Footer() {
             © {new Date().getFullYear()} TrialMatchRX. All rights reserved.
           </p>
           <p className="text-sm text-surface-500 flex items-center gap-1">
-            Powered by Chaisson, Brown & Mimi
+            Powered by Chaisson, Brown & Mimii
             <Heart className="w-4 h-4 text-secondary-500 fill-secondary-500" />
           </p>
         </div>

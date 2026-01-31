@@ -79,7 +79,7 @@ export default function ProfilePage() {
     }
   }, [user, profile]);
 
-  const handleSave = async () => {
+  const handleSave = async () => { console.log("SAVE STARTED");
     setIsSaving(true);
     setSaveError('');
     setSaveSuccess(false);
