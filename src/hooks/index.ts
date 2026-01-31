@@ -113,7 +113,7 @@ export function useAuth() {
     logout();
   }, [logout]);
 
-  const saveProfile = useCallback(async (profileData: PatientProfile) => {
+  const saveProfile = useCallback(async (profileData: PatientProfile) => { console.log("INSIDE SAVEPROFILE", profileData);
     if (!user) return;
     
     // Remove undefined values - Firestore doesn't accept them
@@ -122,7 +122,7 @@ export function useAuth() {
     ) as PatientProfile;
     
     try {
-      await updateUserProfile(user.uid, cleanedProfile);
+      console.log("CALLING UPDATEUSERPROFILE"); await updateUserProfile(user.uid, cleanedProfile); console.log("UPDATEUSERPROFILE DONE");
       setProfile(cleanedProfile);
     } catch (err) {
       console.warn('Failed to save profile to Firestore:', err);
