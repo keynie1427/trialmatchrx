@@ -51,7 +51,7 @@ export function useAuth() {
               );
             }
             if (userData) { if (userData.profile) { setProfile(userData.profile); }
-              setUser(userData);
+              setUser({ ...userData, email: firebaseUser.email || userData.email });
             }
           } catch (err) {
             // Firestore unavailable - continue with basic auth data
