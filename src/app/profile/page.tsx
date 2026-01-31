@@ -85,7 +85,7 @@ export default function ProfilePage() {
     setSaveSuccess(false);
 
     try {
-      console.log("CALLING SAVEPROFILE"); await saveProfile({ willingToTravel: true, preferredPhases: [], excludePhase1: false,
+      console.log("CALLING SAVEPROFILE"); await saveProfile({ willingToTravel: true, preferredPhases: [], excludePhase1: false, displayName: formData.displayName,
         cancerType: formData.cancerType,
         cancerSubtype: formData.cancerSubtype,
         stage: formData.stage as any,
