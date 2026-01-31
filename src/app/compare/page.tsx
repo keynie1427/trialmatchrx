@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -28,7 +28,7 @@ import { useSavedTrials, useAuth } from '@/hooks';
 import { findMatchingTherapies, getNciDrugUrl } from '@/lib/fda-therapies';
 import type { Trial } from '@/types';
 
-export default function ComparePage() {
+function ComparePageContent() {
   const searchParams = useSearchParams();
   const { savedTrialIds, isSaved, toggleSaved } = useSavedTrials();
   const { profile } = useAuth();
@@ -615,4 +615,12 @@ function extractBiomarkers(text: string): string[] {
   const upper = text.toUpperCase();
   patterns.forEach(p => { if (upper.includes(p)) found.add(p); });
   return Array.from(found);
+}
+
+export default function ComparePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <ComparePageContent />
+    </Suspense>
+  );
 }
