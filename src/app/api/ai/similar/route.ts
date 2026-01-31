@@ -226,7 +226,7 @@ function transformStudy(study: any): any {
       nctId: id.nctId,
       briefTitle: id.briefTitle,
       officialTitle: id.officialTitle,
-      status: mapStatus(status.overallStatus),
+      status: mapStatus(status.overallStatus) as any,
       phase: mapPhase(design.phases?.[0]),
       conditions: conditions.conditions || [],
       interventions: (arms.interventions || []).map((i: any) => ({

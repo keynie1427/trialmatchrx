@@ -69,7 +69,7 @@ async function fetchTrialFromCTG(nctId: string): Promise<Trial | null> {
       title: id.briefTitle,
       briefTitle: id.briefTitle,
       officialTitle: id.officialTitle,
-      status: mapStatus(status.overallStatus),
+      status: mapStatus(status.overallStatus) as any,
       statusVerifiedDate: status.statusVerifiedDate,
       lastUpdateDate: status.lastUpdateSubmitDate || new Date().toISOString(),
       phase: mapPhase(design.phases?.[0]),
