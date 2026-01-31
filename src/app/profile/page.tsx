@@ -90,7 +90,7 @@ export default function ProfilePage() {
         cancerSubtype: formData.cancerSubtype,
         stage: formData.stage as any,
         biomarkers: formData.biomarkers,
-        priorTreatments: formData.priorTreatments.map(t => ({ treatment: t, type: 'other' })),
+        priorTreatments: formData.priorTreatments.map(t => ({ treatment: t, type: 'other', current: false })) as any,
         treatmentNaive: formData.treatmentNaive,
         age: formData.age ? parseInt(formData.age) : undefined,
         ecogStatus: formData.ecogStatus ? parseInt(formData.ecogStatus) : undefined,
