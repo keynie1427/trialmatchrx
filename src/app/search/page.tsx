@@ -33,7 +33,7 @@ export default function SearchPage() {
     const parts: string[] = [];
     if (criteria.cancerType) parts.push(criteria.cancerType);
     if (criteria.stage) parts.push(criteria.stage);
-    if (criteria.biomarkers?.length > 0) parts.push(...criteria.biomarkers);
+    if (criteria.biomarkers && criteria.biomarkers.length > 0) parts.push(...criteria.biomarkers);
     return parts.join(' ');
   }, [criteria]);
 
