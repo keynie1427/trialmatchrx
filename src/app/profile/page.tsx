@@ -74,7 +74,7 @@ export default function ProfilePage() {
         age: profile.age?.toString() || '',
         ecogStatus: profile.ecogStatus?.toString() || '',
         zip: profile.zip || '',
-        searchRadius: profile.searchRadius?.toString() || '50',
+        searchRadius: profile.searchRadius?.toString() || '50', alertsEnabled: profile.alertsEnabled || false,
       }));
     }
   }, [user, profile]);
@@ -85,7 +85,7 @@ export default function ProfilePage() {
     setSaveSuccess(false);
 
     try {
-      console.log("CALLING SAVEPROFILE"); await saveProfile({ willingToTravel: true, preferredPhases: [], excludePhase1: false, displayName: formData.displayName,
+      console.log("CALLING SAVEPROFILE"); await saveProfile({ willingToTravel: true, preferredPhases: [], excludePhase1: false, displayName: formData.displayName, alertsEnabled: formData.alertsEnabled,
         cancerType: formData.cancerType,
         cancerSubtype: formData.cancerSubtype,
         stage: formData.stage as any,
