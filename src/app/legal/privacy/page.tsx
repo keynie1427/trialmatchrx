@@ -4,7 +4,7 @@ import React from 'react';
 
 const EFFECTIVE_DATE = 'January 30, 2026';
 const APP_NAME = 'TrialMatchRX';
-const CONTACT_EMAIL = '[trialmatchrx@ijelany.com]';
+const CONTACT_EMAIL = 'trialmatchrx@ijelany.com';
 
 export default function PrivacyPolicyPage() {
   return (
