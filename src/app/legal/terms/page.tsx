@@ -168,7 +168,7 @@ export default function TermsOfUsePage() {
 
           <Section title="15. Contact Information">
             <p>
-              If you have questions about these Terms, please contact us at: {CONTACT_EMAIL}
+              If you have questions about these Terms, please contact us at: {trialmatchrx@ijelany.com}
             </p>
           </Section>
         </div>
