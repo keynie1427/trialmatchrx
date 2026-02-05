@@ -41,6 +41,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-mesh bg-fixed">
         <div className="relative min-h-screen bg-noise">
           {children}
+          <FeedbackWidget />
         </div>
       </body>
     </html>
