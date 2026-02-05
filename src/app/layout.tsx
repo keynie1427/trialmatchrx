@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import FeedbackWidget from '@/components/FeedbackWidget';
 import './globals.css';
 
 export const metadata: Metadata = {
