@@ -3,6 +3,19 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks';
 import { auth } from '@/lib/firebase';
+import { analytics_events } from '@/lib/analytics';
+
+// Find your handleCreateAlert or similar function:
+const handleCreateAlert = async () => {
+  // Your existing alert creation logic...
+  await addDoc(collection(db, 'trial_alerts'), alertData);
+
+  // Track the alert creation
+  analytics_events.alertCreated({
+    cancerType: cancerType || undefined,
+    keywords: keywords || undefined
+  });
+};
 
 interface AlertPreferences {
   enabled: boolean;

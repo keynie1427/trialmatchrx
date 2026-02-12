@@ -19,6 +19,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import SearchForm from '@/components/SearchForm';
 
+
 const features = [
   {
     icon: Sparkles,

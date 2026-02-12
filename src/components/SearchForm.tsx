@@ -17,6 +17,7 @@ import {
 import { useTrialSearch } from '@/hooks';
 import { CANCER_TYPES, BIOMARKERS, STAGES, PHASES, PRIOR_TREATMENTS } from '@/types';
 import type { SearchCriteria, CancerStage, TrialPhase } from '@/types';
+import { analytics_events } from '@/lib/analytics'; // ADD THIS IMPORT
 
 interface SearchFormProps {
   onSearch?: (criteria: SearchCriteria) => void;
@@ -43,6 +44,13 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     e.preventDefault();
 
     if (useAI && aiQuery.trim()) {
+      // TRACK AI SEARCH
+      analytics_events.trialSearch({
+        searchType: 'ai',
+        aiQuery: aiQuery.trim(),
+        queryLength: aiQuery.trim().length
+      });
+
       await searchWithAI(aiQuery);
     } else {
       const searchCriteria: SearchCriteria = {
@@ -55,7 +63,19 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
         distance: zip ? distance : undefined,
         status: ['Recruiting'],
       };
-      
+
+      // TRACK STANDARD SEARCH
+      analytics_events.trialSearch({
+        searchType: 'standard',
+        cancerType: cancerType || undefined,
+        stage: stage || undefined,
+        biomarkerCount: selectedBiomarkers.length,
+        phaseCount: selectedPhases.length,
+        hasPriorTreatment: !!priorTreatment,
+        hasLocation: !!zip,
+        distance: zip ? distance : undefined
+      });
+
       await search(searchCriteria);
       onSearch?.(searchCriteria);
     }
@@ -64,10 +84,10 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     if (compact) {
       router.push('/search');
     }
-  }, [useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, zip, distance, search, searchWithAI, onSearch]);
+  }, [useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, zip, distance, search, searchWithAI, onSearch, compact, router]);
 
   const toggleBiomarker = (biomarker: string) => {
-    setSelectedBiomarkers(prev => 
+    setSelectedBiomarkers(prev =>
       prev.includes(biomarker)
         ? prev.filter(b => b !== biomarker)
         : [...prev, biomarker]
@@ -75,7 +95,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
   };
 
   const togglePhase = (phase: TrialPhase) => {
-    setSelectedPhases(prev => 
+    setSelectedPhases(prev =>
       prev.includes(phase)
         ? prev.filter(p => p !== phase)
         : [...prev, phase]
@@ -91,9 +111,12 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     setZip('');
     setDistance(100);
     setAiQuery('');
+
+    // TRACK FILTER CLEAR
+    analytics_events.trackEvent('filters_cleared', {});
   };
 
-  const hasFilters = cancerType || stage || selectedBiomarkers.length > 0 || 
+  const hasFilters = cancerType || stage || selectedBiomarkers.length > 0 ||
                      selectedPhases.length > 0 || priorTreatment || zip;
 
   return (
@@ -102,9 +125,13 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => setUseAI(!useAI)}
+          onClick={() => {
+            setUseAI(!useAI);
+            // TRACK AI TOGGLE
+            analytics_events.trackEvent('ai_search_toggled', { enabled: !useAI });
+          }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-            useAI 
+            useAI
               ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-lg'
               : 'bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700'
           }`}
@@ -249,7 +276,11 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
             {!compact && (
               <button
                 type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
+                onClick={() => {
+                  setShowAdvanced(!showAdvanced);
+                  // TRACK ADVANCED FILTERS TOGGLE
+                  analytics_events.trackEvent('advanced_filters_toggled', { expanded: !showAdvanced });
+                }}
                 className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
               >
                 <Filter className="w-4 h-4" />

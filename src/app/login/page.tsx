@@ -18,6 +18,29 @@ import {
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/hooks';
+import { analytics_events, identifyUser } from '@/lib/analytics';
+
+// In your sign in handler:
+const handleSignIn = async (email: string, password: string) => {
+  const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+  // Identify user
+  identifyUser(userCredential.user.uid);
+
+  // Track sign in
+  analytics_events.signIn();
+};
+
+// In your sign up handler:
+const handleSignUp = async (email: string, password: string) => {
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+  // Identify user
+  identifyUser(userCredential.user.uid);
+
+  // Track sign up
+  analytics_events.signUp();
+};
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 

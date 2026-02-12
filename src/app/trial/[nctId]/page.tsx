@@ -37,6 +37,7 @@ import TrialSimilar from '@/components/TrialSimilar';
 import { useSavedTrials, useAuth } from '@/hooks';
 import type { Trial, TrialPhase } from '@/types';
 
+
 // Fetch trial from ClinicalTrials.gov API
 async function fetchTrialFromCTG(nctId: string): Promise<Trial | null> {
   try {

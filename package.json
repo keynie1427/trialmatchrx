@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
-    "firebase": "^10.14.0",
+    "firebase": "^10.14.1",
     "firebase-admin": "^12.6.0",
     "framer-motion": "^11.11.0",
     "lucide-react": "^0.454.0",

@@ -2,6 +2,18 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/hooks';
+import { analytics_events } from '@/lib/analytics';
+
+// Find your feedback submit handler:
+const handleSubmit = async () => {
+  // Your existing feedback logic...
+
+  // Track feedback submission
+  analytics_events.feedbackSubmitted({
+    rating: rating,
+    hasComment: !!comment
+  });
+};
 
 export default function FeedbackWidget() {
   const { user } = useAuth();
