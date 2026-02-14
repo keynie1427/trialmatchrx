@@ -724,7 +724,6 @@ export default function TrialDetailPage() {
                             )}
                             {location.contact.phone && (
 
-                                <a
                                 href={`tel:${location.contact.phone}`}
                                 className="flex items-center gap-1.5 text-primary-600 dark:text-primary-400 hover:underline"
                                 onClick={() => {
@@ -742,7 +741,6 @@ export default function TrialDetailPage() {
                             )}
                             {location.contact.email && (
 
-                                <a
                                 href={`mailto:${location.contact.email}`}
                                 className="flex items-center gap-1.5 text-primary-600 dark:text-primary-400 hover:underline"
                                 onClick={() => {
@@ -845,7 +843,6 @@ export default function TrialDetailPage() {
                       <div className="text-sm font-medium mb-3">Contact Information</div>
                       {trial.overallContact.phone && (
 
-                          <a
                           href={`tel:${trial.overallContact.phone}`}
                           className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:underline mb-2"
                           onClick={() => {
@@ -863,7 +860,6 @@ export default function TrialDetailPage() {
                       )}
                       {trial.overallContact.email && (
 
-                          <a
                           href={`mailto:${trial.overallContact.email}`}
                           className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:underline"
                           onClick={() => {
