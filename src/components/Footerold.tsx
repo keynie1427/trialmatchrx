@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Heart } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -17,11 +17,11 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-surface-600 dark:text-surface-400 text-sm max-w-md">
-              AI-powered precision matching for cancer clinical trials. Find trials personalized
+              AI-powered precision matching for cancer clinical trials. Find trials personalized 
               to your cancer type, stage, biomarkers, and treatment history.
             </p>
             <p className="text-surface-500 text-xs mt-4">
-              Clinical trial data sourced from ClinicalTrials.gov. Proprietary analysis,
+              Clinical trial data sourced from ClinicalTrials.gov. Proprietary analysis, 
               scoring logic, and summaries are the intellectual property of TrialMatchRX.
             </p>
           </div>
@@ -81,38 +81,22 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Mission & Vision */}
-        <div className="mt-12 pt-8 border-t border-surface-200 dark:border-surface-800 grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary-600 dark:text-primary-400 mb-1">
-              Our Mission
-            </p>
-            <p className="text-sm text-surface-600 dark:text-surface-400">
-              To use AI to eliminate the gap between breakthrough cancer research and the patients who need it most.
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary-600 dark:text-primary-400 mb-1">
-              Our Vision
-            </p>
-            <p className="text-sm text-surface-600 dark:text-surface-400">
-              A world where no cancer patient misses a life-saving trial because they didn't know it existed.
-            </p>
-          </div>
-        </div>
-
         {/* Bottom Bar */}
-        <div className="mt-8 pt-6 border-t border-surface-200 dark:border-surface-800 flex items-center justify-center">
+        <div className="mt-12 pt-8 border-t border-surface-200 dark:border-surface-800 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-surface-500">
             © {new Date().getFullYear()} TrialMatchRX. All rights reserved.
+          </p>
+          <p className="text-sm text-surface-500 flex items-center gap-1">
+            Powered by Chaisson, Brown & Mimii
+            <Heart className="w-4 h-4 text-secondary-500 fill-secondary-500" />
           </p>
         </div>
 
         {/* Disclaimer */}
         <div className="mt-6 p-4 rounded-xl bg-surface-100 dark:bg-surface-900 text-center">
           <p className="text-xs text-surface-500">
-            <strong>Medical Disclaimer:</strong> TrialMatchRX does not provide medical advice.
-            Always consult a licensed healthcare professional before making decisions about
+            <strong>Medical Disclaimer:</strong> TrialMatchRX does not provide medical advice. 
+            Always consult a licensed healthcare professional before making decisions about 
             clinical trial participation. The information provided is for educational purposes only.
           </p>
         </div>
