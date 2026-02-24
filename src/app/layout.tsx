@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import FeedbackWidget from '@/components/FeedbackWidget';
+import CookieConsent from '@/components/CookieConsent';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -60,6 +61,7 @@ export default function RootLayout({
         <div className="relative min-h-screen bg-noise">
           {children}
           <FeedbackWidget />
+          <CookieConsent />
         </div>
       </body>
     </html>
