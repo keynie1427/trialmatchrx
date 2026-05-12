@@ -11,7 +11,7 @@
 //   3. Email not whitelisted → redirect to /trial-matcher/access-denied
 //   4. Email whitelisted    → render dashboard with role from Firestore
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -35,7 +35,7 @@ import Header from '@/components/Header';
 import { useAuth } from '@/hooks/useAuth';
 import { checkTrialMatcherAccess, type TrialMatcherRole, type TrialMatcherUser } from '@/lib/trialMatcherAuth';
 import {
-  PATIENTS,
+  PATIENTS as STATIC_PATIENTS,
   TRIALS,
   STATUS_CONFIG,
   type TrialMatcherPatient,
@@ -454,6 +454,11 @@ export default function TrialMatcherPage() {
   const [accessChecking, setAccessChecking] = useState(false);
   const [accessUser, setAccessUser] = useState<TrialMatcherUser | null>(null);
 
+  // Patient data state — fetched from API, falls back to static dataset
+  const [patients, setPatients]           = useState<TrialMatcherPatient[]>(STATIC_PATIENTS);
+  const [dataSource, setDataSource]       = useState<'static' | 'fhir' | 'loading'>('static');
+  const [dataError, setDataError]         = useState<string | null>(null);
+
   // Dashboard state
   const [activeTrial, setActiveTrial]     = useState('NCT06983743');
   const [selectedPt, setSelectedPt]       = useState<TrialMatcherPatient | null>(null);
@@ -493,22 +498,51 @@ export default function TrialMatcherPage() {
     });
   }, [user, authLoading, router]);
 
+  // ── Fetch live patient data from API (Synthea FHIR or future Firestore)
+  const fetchPatients = useCallback(async () => {
+    setDataSource('loading');
+    setDataError(null);
+    try {
+      const res = await fetch('/api/trial-matcher/patients');
+      if (!res.ok) throw new Error(`API error ${res.status}`);
+      const data = await res.json();
+      if (data.patients && data.patients.length > 0) {
+        setPatients(data.patients);
+        setDataSource('fhir');
+      } else {
+        // API returned empty — stay on static data
+        setPatients(STATIC_PATIENTS);
+        setDataSource('static');
+        if (data.message) setDataError(data.message);
+      }
+    } catch (err) {
+      console.warn('[TrialMatcher] API fetch failed, using static data:', err);
+      setPatients(STATIC_PATIENTS);
+      setDataSource('static');
+    }
+  }, []);
+
+  // Fetch once access is confirmed
+  useEffect(() => {
+    if (accessUser) fetchPatients();
+  }, [accessUser, fetchPatients]);
+
   // ── Derived data ───────────────────────────────────────────────────────────
 
-  const cancerTypes = useMemo(() => [...new Set(PATIENTS.map((p) => p.cancerType))].sort(), []);
+  const cancerTypes = useMemo(() => [...new Set(patients.map((p) => p.cancerType))].sort(), [patients]);
 
   const trialStats = useMemo(() =>
     Object.fromEntries(
       Object.keys(TRIALS).map((id) => [id, {
-        eligible: PATIENTS.filter((p) => p.trialMatches[id].status === 'LIKELY_ELIGIBLE').length,
-        review:   PATIENTS.filter((p) => p.trialMatches[id].status === 'REVIEW_REQUIRED').length,
+        eligible: patients.filter((p) => p.trialMatches[id].status === 'LIKELY_ELIGIBLE').length,
+        review:   patients.filter((p) => p.trialMatches[id].status === 'REVIEW_REQUIRED').length,
       }])
-    ), []);
+    ), [patients]);
 
   const activeStats = trialStats[activeTrial] || { eligible: 0, review: 0 };
 
   const filtered = useMemo(() =>
-    PATIENTS.filter((p) => {
+    patients.filter((p) => {
       const ts = p.trialMatches[activeTrial]?.status ?? 'EXCLUDED';
       if (statusFilter !== 'all' && ts !== statusFilter) return false;
       if (cancerFilter !== 'all' && p.cancerType !== cancerFilter) return false;
@@ -520,7 +554,7 @@ export default function TrialMatcherPage() {
       const ob = order[b.trialMatches[activeTrial]?.status ?? 'EXCLUDED'];
       if (ob !== oa) return ob - oa;
       return (b.trialMatches[activeTrial]?.score ?? 0) - (a.trialMatches[activeTrial]?.score ?? 0);
-    }), [activeTrial, statusFilter, cancerFilter, search]);
+    }), [patients, activeTrial, statusFilter, cancerFilter, search]);
 
   function handleTrialSwitch(id: string) {
     setActiveTrial(id);
@@ -560,7 +594,7 @@ export default function TrialMatcherPage() {
                 Trial Matcher
               </h1>
               <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-                EMR-driven · {PATIENTS.length} actionable patients from 1,000 screened · No questionnaires
+                EMR-driven · {dataSource === 'loading' ? 'Loading patients…' : `${patients.length} patients`} · {dataSource === 'fhir' ? 'Synthea FHIR R4' : 'Synthetic POC data'}
               </p>
             </div>
 
@@ -611,10 +645,22 @@ export default function TrialMatcherPage() {
             <div className="p-3 mt-auto border-t border-surface-100 dark:border-surface-800">
               <p className="text-[9px] font-bold text-surface-400 uppercase tracking-wider mb-1">Data source</p>
               <p className="text-[10px] text-surface-500 dark:text-surface-400 leading-relaxed">
-                1,000 synthetic patients<br />
-                Latest visit per patient<br />
-                <span className="text-surface-400">EMR-driven · No questionnaires</span>
+                {dataSource === 'fhir' ? (
+                  <><span className="text-emerald-600 font-semibold">● Synthea FHIR R4</span><br />{patients.length} patients loaded</>
+                ) : dataSource === 'loading' ? (
+                  <><span className="text-amber-600 font-semibold">● Loading…</span></>
+                ) : (
+                  <><span className="text-surface-400 font-semibold">● POC synthetic data</span><br />{patients.length} patients</>
+                )}
+                {dataError && <span className="text-amber-500 block mt-1">{dataError}</span>}
               </p>
+              <button
+                onClick={fetchPatients}
+                disabled={dataSource === 'loading'}
+                className="mt-2 text-[10px] text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-40"
+              >
+                {dataSource === 'loading' ? 'Loading…' : '↻ Refresh data'}
+              </button>
             </div>
           </aside>
 
