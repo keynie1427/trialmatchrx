@@ -33,37 +33,50 @@ import { db } from '@/lib/firebase';
 export type TrialMatcherRole = 'crc' | 'physician';
 
 export interface TrialMatcherUser {
-  email: string;
-  role: TrialMatcherRole;
-  name?: string;
-  organization?: string;
-  active: boolean;
+email: string;
+role: TrialMatcherRole;
+name?: string;
+organization?: string;
+active: boolean;
 }
 
 export type AccessResult =
-  | { granted: true;  user: TrialMatcherUser }
-  | { granted: false; reason: 'not_authenticated' | 'not_whitelisted' | 'inactive' | 'error' };
+| { granted: true;  user: TrialMatcherUser }
+| { granted: false; reason: 'not_authenticated' | 'not_whitelisted' | 'inactive' | 'error' };
 
 /**
- * Checks whether the given email is on the trial_matcher_users whitelist.
- * Returns the user's role if access is granted, or a denial reason if not.
- */
+* Checks whether the given email is on the trial_matcher_users whitelist.
+* Returns the user's role if access is granted, or a denial reason if not.
+*/
 export async function checkTrialMatcherAccess(email: string): Promise<AccessResult> {
   try {
     // Normalize email — Firestore doc IDs are case-sensitive
     const normalizedEmail = email.trim().toLowerCase();
+
+    console.log('[TrialMatcherAuth] Checking email:', normalizedEmail);
+
     const docRef = doc(db, 'trial_matcher_users', normalizedEmail);
     const docSnap = await getDoc(docRef);
 
+    console.log('[TrialMatcherAuth] Document exists:', docSnap.exists());
+    console.log('[TrialMatcherAuth] Document data:', docSnap.data());
+
     if (!docSnap.exists()) {
+      console.warn('[TrialMatcherAuth] Email not found in whitelist:', normalizedEmail);
       return { granted: false, reason: 'not_whitelisted' };
     }
 
     const data = docSnap.data() as TrialMatcherUser;
 
+    console.log('[TrialMatcherAuth] Role:', data.role);
+    console.log('[TrialMatcherAuth] Active:', data.active);
+
     if (data.active === false) {
+      console.warn('[TrialMatcherAuth] User is inactive:', normalizedEmail);
       return { granted: false, reason: 'inactive' };
     }
+
+    console.log('[TrialMatcherAuth] Access granted for:', normalizedEmail);
 
     return {
       granted: true,

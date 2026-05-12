@@ -55,6 +55,7 @@ interface FhirReference {
 interface FhirPatient {
   resourceType: 'Patient';
   id?: string;
+  identifier?: Array<{ system?: string; value?: string }>;
   birthDate?: string;     // "1960-03-15"
   gender?: 'male' | 'female' | 'other' | 'unknown';
 }
@@ -534,7 +535,9 @@ export function parseFhirBundle(bundle: FhirBundle): TrialMatcherPatient | null 
 
   if (!patient || !patient.birthDate) return null;
 
-  const patientId = patient.id || `FHIR-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
+  const patientId = patient.identifier?.find(i => i.system === 'urn:trialmatchrx:patient')?.value
+    || patient.id
+    || `FHIR-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
 
   // ── Demographics
   const age = getAge(patient.birthDate);
