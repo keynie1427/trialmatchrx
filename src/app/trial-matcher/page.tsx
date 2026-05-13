@@ -14,7 +14,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { auth } from '@/lib/firebase';
 import {
+
   Search,
   CheckCircle2,
   XCircle,
@@ -545,8 +547,9 @@ export default function TrialMatcherPage() {
   // ── Fetch notifications ────────────────────────────────────────────────────
   const fetchNotifications = useCallback(async () => {
     try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) return;
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+      const token = await currentUser.getIdToken(true);
       const res = await fetch('/api/trial-matcher/rescreen', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -555,7 +558,9 @@ export default function TrialMatcherPage() {
       const unread = (data.notifications || []).filter((n: any) => !n.read);
       setNotifications(data.notifications || []);
       setNotifCount(unread.length);
-    } catch { /* silent */ }
+    } catch (err) {
+      console.warn('[Notifications] fetch failed:', err);
+    }
   }, []);
 
   // Fetch notifications once access is confirmed
@@ -702,15 +707,29 @@ export default function TrialMatcherPage() {
                         ))
                       )}
                     </div>
-                    <div className="px-4 py-2.5 border-t border-surface-100 dark:border-surface-800">
+                    <div className="px-4 py-2.5 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between">
                       <button
                         onClick={async () => {
                           try {
-                            const token = await auth.currentUser?.getIdToken();
-                            if (token) await fetch('/api/trial-matcher/rescreen', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ dryRun: false }) });
+                            const currentUser = auth.currentUser;
+                            if (!currentUser) {
+                              console.error('[Rescreen] No current user');
+                              return;
+                            }
+                            const token = await currentUser.getIdToken(true);
+                            console.log('[Rescreen] Triggering with token:', token.slice(0, 20) + '...');
+                            const res = await fetch('/api/trial-matcher/rescreen', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                              body: JSON.stringify({ dryRun: false }),
+                            });
+                            const data = await res.json();
+                            console.log('[Rescreen] Response:', data);
                             fetchNotifications();
                             setNotifOpen(false);
-                          } catch { /* silent */ }
+                          } catch (err) {
+                            console.error('[Rescreen] Error:', err);
+                          }
                         }}
                         className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
                       >
