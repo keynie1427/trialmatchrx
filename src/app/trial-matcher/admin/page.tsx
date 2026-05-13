@@ -36,7 +36,7 @@ import { auth } from '@/lib/firebase';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type UserRole = 'crc' | 'physician' | 'admin';
+type UserRole = 'crc' | 'physician' | 'admin' | 'sponsor';
 
 interface WhitelistUser {
   email: string;
@@ -46,6 +46,7 @@ interface WhitelistUser {
   active: boolean;
   addedAt: string | null;
   lastLogin: string | null;
+  assignedTrialId?: string | null;
 }
 
 // ─── Role Badge ───────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ function RoleBadge({ role }: { role: UserRole }) {
     admin:     { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-800 dark:text-purple-300', label: 'Admin' },
     crc:       { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-800 dark:text-emerald-300', label: 'CRC' },
     physician: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', label: 'Physician' },
+    sponsor:   { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-800 dark:text-orange-300', label: 'Sponsor' },
   }[role] || { bg: 'bg-surface-100', text: 'text-surface-600', label: role };
 
   return (
@@ -79,13 +81,14 @@ function UserModal({
   const [role, setRole]         = useState<UserRole>(user?.role || 'crc');
   const [name, setName]         = useState(user?.name || '');
   const [org, setOrg]           = useState(user?.organization || '');
+  const [trialId, setTrialId]   = useState(user?.assignedTrialId || '');
   const [error, setError]       = useState('');
 
   async function handleSubmit() {
     setError('');
     if (!email.trim()) return setError('Email is required');
     if (!email.includes('@')) return setError('Enter a valid email address');
-    await onSave({ email: email.trim().toLowerCase(), role, name: name.trim(), organization: org.trim() });
+    await onSave({ email: email.trim().toLowerCase(), role, name: name.trim(), organization: org.trim(), assignedTrialId: role === 'sponsor' ? trialId.trim() : undefined });
   }
 
   return (
@@ -128,8 +131,34 @@ function UserModal({
               <option value="crc">CRC — Clinical Research Coordinator</option>
               <option value="physician">Physician</option>
               <option value="admin">Admin</option>
+              <option value="sponsor">Sponsor — Read-only portal access</option>
             </select>
           </div>
+
+          {role === 'sponsor' && (
+            <div>
+              <label className="block text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1.5">
+                Assigned trial NCT ID *
+              </label>
+              <select
+                value={trialId}
+                onChange={e => setTrialId(e.target.value)}
+                className="w-full px-3 py-2 text-sm rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none focus:border-primary-400 cursor-pointer"
+              >
+                <option value="">Select a trial…</option>
+                <option value="NCT06983743">NCT06983743 — ERAS-0015 (AURORAS-1)</option>
+                <option value="NCT04093167">NCT04093167 — MARIPOSA-2</option>
+                <option value="NCT04657003">NCT04657003 — BREAKWATER</option>
+                <option value="NCT02628067">NCT02628067 — KEYNOTE-158</option>
+                <option value="NCT02422615">NCT02422615 — MONARCH-3</option>
+                <option value="NCT04494425">NCT04494425 — DESTINY-Breast06</option>
+                <option value="NCT02263508">NCT02263508 — MASTERKEY-265</option>
+                <option value="NCT03318939">NCT03318939 — ZENITH20</option>
+                <option value="NCT03539536">NCT03539536 — PRODIGE-48</option>
+              </select>
+              <p className="text-xs text-surface-400 mt-1">Sponsor will only see patients eligible for this trial.</p>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1.5">
@@ -416,11 +445,12 @@ export default function TrialMatcherAdminPage() {
   });
 
   const stats = {
-    total:     users.length,
-    active:    users.filter(u => u.active).length,
-    admins:    users.filter(u => u.role === 'admin').length,
-    crcs:      users.filter(u => u.role === 'crc').length,
+    total:      users.length,
+    active:     users.filter(u => u.active).length,
+    admins:     users.filter(u => u.role === 'admin').length,
+    crcs:       users.filter(u => u.role === 'crc').length,
     physicians: users.filter(u => u.role === 'physician').length,
+    sponsors:   users.filter(u => u.role === 'sponsor').length,
   };
 
   // ── Loading / auth states ──────────────────────────────────────────────────
@@ -473,13 +503,14 @@ export default function TrialMatcherAdminPage() {
         <div className="max-w-5xl mx-auto px-6 py-6">
 
           {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-6">
             {[
               { label: 'Total users',  value: stats.total,      color: 'text-surface-900 dark:text-surface-100' },
               { label: 'Active',       value: stats.active,     color: 'text-emerald-700 dark:text-emerald-400' },
               { label: 'Admins',       value: stats.admins,     color: 'text-purple-700 dark:text-purple-400' },
               { label: 'CRCs',         value: stats.crcs,       color: 'text-emerald-700 dark:text-emerald-400' },
               { label: 'Physicians',   value: stats.physicians, color: 'text-blue-700 dark:text-blue-400' },
+              { label: 'Sponsors',     value: stats.sponsors,   color: 'text-orange-700 dark:text-orange-400' },
             ].map(s => (
               <div key={s.label} className="bg-white dark:bg-surface-900 rounded-xl p-3 border border-surface-200 dark:border-surface-700">
                 <p className="text-[10px] font-bold text-surface-400 uppercase tracking-wider mb-1">{s.label}</p>
@@ -508,6 +539,7 @@ export default function TrialMatcherAdminPage() {
               <option value="admin">Admin</option>
               <option value="crc">CRC</option>
               <option value="physician">Physician</option>
+              <option value="sponsor">Sponsor</option>
             </select>
             <span className="text-sm text-surface-400">{filtered.length} users</span>
             <button onClick={fetchUsers} className="ml-auto text-xs text-primary-600 dark:text-primary-400 hover:underline">
@@ -533,6 +565,7 @@ export default function TrialMatcherAdminPage() {
                     <th className="text-left p-4 text-xs font-bold text-surface-400 uppercase tracking-wider">User</th>
                     <th className="text-left p-4 text-xs font-bold text-surface-400 uppercase tracking-wider">Role</th>
                     <th className="text-left p-4 text-xs font-bold text-surface-400 uppercase tracking-wider hidden sm:table-cell">Organization</th>
+                    <th className="text-left p-4 text-xs font-bold text-surface-400 uppercase tracking-wider hidden md:table-cell">Assigned trial</th>
                     <th className="text-left p-4 text-xs font-bold text-surface-400 uppercase tracking-wider hidden md:table-cell">Added</th>
                     <th className="text-left p-4 text-xs font-bold text-surface-400 uppercase tracking-wider hidden md:table-cell">Last login</th>
                     <th className="text-left p-4 text-xs font-bold text-surface-400 uppercase tracking-wider">Status</th>
@@ -557,6 +590,12 @@ export default function TrialMatcherAdminPage() {
                         <td className="p-4"><RoleBadge role={u.role} /></td>
                         <td className="p-4 text-surface-500 dark:text-surface-400 hidden sm:table-cell">
                           {u.organization || '—'}
+                        </td>
+                        <td className="p-4 hidden md:table-cell">
+                          {u.assignedTrialId
+                            ? <span className="text-xs font-semibold px-2 py-1 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300">{u.assignedTrialId}</span>
+                            : <span className="text-xs text-surface-400">—</span>
+                          }
                         </td>
                         <td className="p-4 text-surface-400 text-xs hidden md:table-cell">
                           {u.addedAt ? new Date(u.addedAt).toLocaleDateString() : '—'}

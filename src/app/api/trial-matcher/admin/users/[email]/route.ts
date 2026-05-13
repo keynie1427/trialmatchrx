@@ -50,7 +50,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { role, name, organization, active } = body;
+    const { role, name, organization, active, assignedTrialId } = body;
 
     // Prevent admin from removing their own admin role
     if (targetEmail === adminEmail && role && role !== 'admin') {
@@ -59,14 +59,15 @@ export async function PATCH(
 
     const updates: Record<string, unknown> = { updatedAt: new Date(), updatedBy: adminEmail };
     if (role !== undefined) {
-      if (!['crc', 'physician', 'admin'].includes(role)) {
+      if (!['crc', 'physician', 'admin', 'sponsor'].includes(role)) {
         return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
       }
       updates.role = role;
     }
-    if (name !== undefined)         updates.name = name?.trim() || null;
-    if (organization !== undefined) updates.organization = organization?.trim() || null;
-    if (active !== undefined)       updates.active = Boolean(active);
+    if (name !== undefined)             updates.name = name?.trim() || null;
+    if (organization !== undefined)     updates.organization = organization?.trim() || null;
+    if (active !== undefined)           updates.active = Boolean(active);
+    if (assignedTrialId !== undefined)  updates.assignedTrialId = assignedTrialId || null;
 
     const app = getAdminApp();
     const db = getFirestore(app);

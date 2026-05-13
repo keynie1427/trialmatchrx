@@ -14,9 +14,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { auth } from '@/lib/firebase';
 import {
-
   Search,
   CheckCircle2,
   XCircle,
@@ -508,6 +506,11 @@ export default function TrialMatcherPage() {
     checkTrialMatcherAccess(email).then((result) => {
       setAccessChecking(false);
       if (result.granted) {
+        // Sponsors go to their own portal
+        if (result.user.role === 'sponsor') {
+          router.replace('/trial-matcher/sponsor');
+          return;
+        }
         setAccessUser(result.user);
       } else {
         router.replace('/trial-matcher/access-denied');

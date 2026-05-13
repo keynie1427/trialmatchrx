@@ -54,13 +54,14 @@ export async function GET(req: NextRequest) {
     const snapshot = await db.collection('trial_matcher_users').orderBy('addedAt', 'desc').get();
 
     const users = snapshot.docs.map(doc => ({
-      email:        doc.id,
-      role:         doc.data().role,
-      name:         doc.data().name || null,
-      organization: doc.data().organization || null,
-      active:       doc.data().active ?? true,
-      addedAt:      doc.data().addedAt?.toDate?.()?.toISOString() || null,
-      lastLogin:    doc.data().lastLogin?.toDate?.()?.toISOString() || null,
+      email:          doc.id,
+      role:           doc.data().role,
+      name:           doc.data().name || null,
+      organization:   doc.data().organization || null,
+      active:         doc.data().active ?? true,
+      addedAt:        doc.data().addedAt?.toDate?.()?.toISOString() || null,
+      lastLogin:      doc.data().lastLogin?.toDate?.()?.toISOString() || null,
+      assignedTrialId: doc.data().assignedTrialId || null,
     }));
 
     return NextResponse.json({ users, count: users.length });
@@ -80,13 +81,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { email, role, name, organization } = body;
+    const { email, role, name, organization, assignedTrialId } = body;
 
     if (!email || !role) {
       return NextResponse.json({ error: 'email and role are required' }, { status: 400 });
     }
-    if (!['crc', 'physician', 'admin'].includes(role)) {
-      return NextResponse.json({ error: 'role must be crc, physician, or admin' }, { status: 400 });
+    if (!['crc', 'physician', 'admin', 'sponsor'].includes(role)) {
+      return NextResponse.json({ error: 'role must be crc, physician, admin, or sponsor' }, { status: 400 });
+    }
+    if (role === 'sponsor' && !assignedTrialId) {
+      return NextResponse.json({ error: 'Sponsor users must have an assignedTrialId' }, { status: 400 });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -100,14 +104,15 @@ export async function POST(req: NextRequest) {
     }
 
     await docRef.set({
-      email:        normalizedEmail,
+      email:           normalizedEmail,
       role,
-      name:         name?.trim() || null,
-      organization: organization?.trim() || null,
-      active:       true,
-      addedAt:      new Date(),
-      addedBy:      adminEmail,
-      lastLogin:    null,
+      name:            name?.trim() || null,
+      organization:    organization?.trim() || null,
+      active:          true,
+      addedAt:         new Date(),
+      addedBy:         adminEmail,
+      lastLogin:       null,
+      assignedTrialId: assignedTrialId || null,
     });
 
     return NextResponse.json({

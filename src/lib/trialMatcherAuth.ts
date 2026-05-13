@@ -30,24 +30,25 @@
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-export type TrialMatcherRole = 'crc' | 'physician';
+export type TrialMatcherRole = 'crc' | 'physician' | 'admin' | 'sponsor';
 
 export interface TrialMatcherUser {
-email: string;
-role: TrialMatcherRole;
-name?: string;
-organization?: string;
-active: boolean;
+  email: string;
+  role: TrialMatcherRole;
+  name?: string;
+  organization?: string;
+  active: boolean;
+  assignedTrialId?: string;  // Sponsors only — which trial they can view
 }
 
 export type AccessResult =
-| { granted: true;  user: TrialMatcherUser }
-| { granted: false; reason: 'not_authenticated' | 'not_whitelisted' | 'inactive' | 'error' };
+  | { granted: true;  user: TrialMatcherUser }
+  | { granted: false; reason: 'not_authenticated' | 'not_whitelisted' | 'inactive' | 'error' };
 
 /**
-* Checks whether the given email is on the trial_matcher_users whitelist.
-* Returns the user's role if access is granted, or a denial reason if not.
-*/
+ * Checks whether the given email is on the trial_matcher_users whitelist.
+ * Returns the user's role if access is granted, or a denial reason if not.
+ */
 export async function checkTrialMatcherAccess(email: string): Promise<AccessResult> {
   try {
     // Normalize email — Firestore doc IDs are case-sensitive
@@ -86,6 +87,7 @@ export async function checkTrialMatcherAccess(email: string): Promise<AccessResu
         name: data.name,
         organization: data.organization,
         active: true,
+        assignedTrialId: data.assignedTrialId ?? undefined,
       },
     };
   } catch (err) {
