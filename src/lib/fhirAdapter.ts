@@ -1,256 +1,77 @@
 // src/lib/fhirAdapter.ts
 //
-// ─────────────────────────────────────────────────────────────────────────────
-// Synthea FHIR R4 → TrialMatcherPatient Adapter
+// FHIR R4 Bundle → TrialMatcherPatient adapter
+// Supports 9 oncology trials across 6 tumor types
 //
-// Converts a Synthea-generated FHIR R4 Bundle (one file per patient) into the
-// TrialMatcherPatient type the Trial Matcher dashboard expects.
-//
-// FHIR resources used:
-//   Patient       → age, sex
-//   Condition     → cancerType (ICD-10 / SNOMED codes)
-//   Observation   → labs (CBC, CMP) + biomarkers (KRAS, EGFR, BRAF, HER2, MSI)
-//   Procedure     → priorTreatments (chemo, surgery, radiation)
-//   MedicationRequest → priorTreatments (targeted therapy, immunotherapy, hormonal)
-//   Encounter     → lastVisit date
-//
-// USAGE:
-//   import { parseFhirBundle, parseFhirBundleDirectory } from '@/lib/fhirAdapter';
-//
-//   // Single patient file
-//   const patient = parseFhirBundle(fhirJson);
-//
-//   // All patients from a directory (Node.js / build script only)
-//   const patients = await parseFhirBundleDirectory('./synthea-output/fhir');
-//
-// GENERATING SYNTHEA DATA:
-//   1. Download Synthea: https://github.com/synthetichealth/synthea/releases
-//   2. Run: java -jar synthea-with-dependencies.jar -p 200 --exporter.fhir.export=true
-//   3. Output lands in: ./output/fhir/*.json
-//   4. Copy files to: /public/synthea/ or load via API route
-//
-// ─────────────────────────────────────────────────────────────────────────────
+// Biomarkers extracted: KRAS, EGFR, BRAF, HER2, MSI, ER, PR
+// Labs extracted: AST, ALT, Creatinine, Hemoglobin, Platelets, WBC
 
 import type { TrialMatcherPatient } from './trialMatcherData';
-import { TRIALS } from './trialMatcherData';
 
-// ─── FHIR R4 Type Definitions ────────────────────────────────────────────────
-// Minimal types — only the fields we actually read
+// ─── FHIR Types ───────────────────────────────────────────────────────────────
 
-interface FhirCoding {
-  system?: string;
-  code?: string;
-  display?: string;
-}
-
-interface FhirCodeableConcept {
-  coding?: FhirCoding[];
-  text?: string;
-}
-
-interface FhirReference {
-  reference?: string;
-}
-
+interface FhirCoding { system?: string; code?: string; display?: string; }
+interface FhirCodeableConcept { coding?: FhirCoding[]; text?: string; }
 interface FhirPatient {
-  resourceType: 'Patient';
-  id?: string;
+  resourceType: 'Patient'; id?: string;
   identifier?: Array<{ system?: string; value?: string }>;
-  birthDate?: string;     // "1960-03-15"
-  gender?: 'male' | 'female' | 'other' | 'unknown';
+  birthDate?: string; gender?: 'male' | 'female' | 'other' | 'unknown';
 }
-
 interface FhirCondition {
-  resourceType: 'Condition';
-  code?: FhirCodeableConcept;
-  clinicalStatus?: FhirCodeableConcept;
-  onsetDateTime?: string;
-  subject?: FhirReference;
+  resourceType: 'Condition'; code?: FhirCodeableConcept;
+  clinicalStatus?: FhirCodeableConcept; onsetDateTime?: string;
 }
-
 interface FhirObservation {
-  resourceType: 'Observation';
-  code?: FhirCodeableConcept;
-  status?: string;
+  resourceType: 'Observation'; code?: FhirCodeableConcept; status?: string;
   valueQuantity?: { value?: number; unit?: string };
-  valueCodeableConcept?: FhirCodeableConcept;
-  valueString?: string;
+  valueCodeableConcept?: FhirCodeableConcept; valueString?: string;
   effectiveDateTime?: string;
-  subject?: FhirReference;
-  component?: Array<{
-    code?: FhirCodeableConcept;
-    valueQuantity?: { value?: number; unit?: string };
-    valueCodeableConcept?: FhirCodeableConcept;
-  }>;
 }
-
 interface FhirProcedure {
-  resourceType: 'Procedure';
-  code?: FhirCodeableConcept;
-  status?: string;
+  resourceType: 'Procedure'; code?: FhirCodeableConcept; status?: string;
   performedDateTime?: string;
-  performedPeriod?: { start?: string; end?: string };
-  subject?: FhirReference;
 }
-
 interface FhirMedicationRequest {
   resourceType: 'MedicationRequest';
-  medicationCodeableConcept?: FhirCodeableConcept;
-  status?: string;
-  authoredOn?: string;
-  subject?: FhirReference;
+  medicationCodeableConcept?: FhirCodeableConcept; status?: string;
 }
-
 interface FhirEncounter {
-  resourceType: 'Encounter';
-  period?: { start?: string; end?: string };
-  status?: string;
+  resourceType: 'Encounter'; period?: { start?: string; end?: string };
 }
+type FhirResource = FhirPatient | FhirCondition | FhirObservation | FhirProcedure | FhirMedicationRequest | FhirEncounter;
+interface FhirBundle { resourceType: 'Bundle'; entry?: Array<{ resource?: FhirResource }>; }
 
-type FhirResource =
-  | FhirPatient
-  | FhirCondition
-  | FhirObservation
-  | FhirProcedure
-  | FhirMedicationRequest
-  | FhirEncounter;
+// ─── Code Maps ────────────────────────────────────────────────────────────────
 
-interface FhirBundle {
-  resourceType: 'Bundle';
-  entry?: Array<{ resource?: FhirResource }>;
-}
+const CANCER_CODES: Array<{ patterns: string[]; type: string }> = [
+  { patterns: ['C18','C19','C20','C21','363406003','109838007'], type: 'Colorectal Cancer' },
+  { patterns: ['C34','C33','254637007','254626006','424132000'], type: 'Lung Cancer' },
+  { patterns: ['C25','372003004','363418001'], type: 'Pancreatic Cancer' },
+  { patterns: ['C50','363346000','254837009','408643008'], type: 'Breast Cancer' },
+  { patterns: ['C43','C44','372244006','372130007'], type: 'Melanoma' },
+  { patterns: ['C61','399068003','314994000'], type: 'Prostate Cancer' },
+  { patterns: ['C56','C57','363443007','413448000'], type: 'Ovarian Cancer' },
+];
 
-// ─── LOINC Codes for Lab Values ───────────────────────────────────────────────
-// Standard LOINC codes used by Synthea and Epic for common labs
-
-const LOINC_LABS: Record<string, keyof LabValues> = {
-  '1742-6':  'alt',         // Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma
-  '1920-8':  'ast',         // Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma
-  '2160-0':  'creatinine',  // Creatinine [Mass/volume] in Serum or Plasma
-  '718-7':   'hemoglobin',  // Hemoglobin [Mass/volume] in Blood
-  '777-3':   'platelets',   // Platelets [#/volume] in Blood by Automated count
-  '6690-2':  'wbc',         // Leukocytes [#/volume] in Blood by Automated count
-  '26464-8': 'wbc',         // Leukocytes [#/volume] in Blood (alternate)
-  '32623-1': 'platelets',   // Platelet mean volume (alternate)
+const BIOMARKER_LOINC: Record<string, string[]> = {
+  kras: ['55233-1','21717-0','79476-8'],
+  egfr: ['55201-8','85319-2'],
+  braf: ['81287-0','55233-1'],
+  her2: ['72383-3','18474-7','85319-2'],
+  msi:  ['81695-4','85062-8'],
+  er:   ['85319-2','10861-3'],
+  pr:   ['85320-0','10862-1'],
 };
 
-interface LabValues {
-  ast: number | null;
-  alt: number | null;
-  creatinine: number | null;
-  hemoglobin: number | null;
-  platelets: number | null;
-  wbc: number | null;
-}
+const CHEMO_CODES = ['367336001','385786002'];
+const CHEMO_PATTERNS = ['folfox','folfiri','capecitabine','oxaliplatin','irinotecan','carboplatin','cisplatin','paclitaxel','docetaxel','gemcitabine','fluorouracil','5-fu','cyclophosphamide','doxorubicin'];
+const IMMUNO_PATTERNS = ['pembrolizumab','nivolumab','atezolizumab','durvalumab','ipilimumab','cemiplimab','keytruda','opdivo','talimogene'];
+const TARGETED_PATTERNS = ['osimertinib','erlotinib','gefitinib','afatinib','lapatinib','vemurafenib','dabrafenib','encorafenib','trametinib','cetuximab','panitumumab','bevacizumab','trastuzumab','pertuzumab','abemaciclib','ribociclib','palbociclib','amivantamab','adagrasib','sotorasib'];
+const HORMONAL_PATTERNS = ['tamoxifen','letrozole','anastrozole','exemestane','fulvestrant','leuprolide','bicalutamide','enzalutamide'];
+const RADIATION_CODES = ['108290001','33195004','385798007'];
+const SURGERY_CODES = ['387713003','173171007','456381000124102'];
 
-// ─── ICD-10 / SNOMED Cancer Type Mapping ────────────────────────────────────
-
-const CANCER_CODE_MAP: Array<{ patterns: string[]; type: string }> = [
-  {
-    patterns: ['C18', 'C19', 'C20', 'C21', '363406003', '109838007', '93761005'],
-    type: 'Colorectal Cancer',
-  },
-  {
-    patterns: ['C34', 'C33', '363358000', '254637007', '254626006', '424132000'],
-    type: 'Lung Cancer',
-  },
-  {
-    patterns: ['C25', '372003004', '363418001'],
-    type: 'Pancreatic Cancer',
-  },
-  {
-    patterns: ['C50', '363346000', '254837009', '408643008'],
-    type: 'Breast Cancer',
-  },
-  {
-    patterns: ['C43', 'C44', '372244006', '372130007'],
-    type: 'Melanoma',
-  },
-  {
-    patterns: ['C61', '399068003', '314994000'],
-    type: 'Prostate Cancer',
-  },
-  {
-    patterns: ['C56', 'C57', '363443007', '413448000'],
-    type: 'Ovarian Cancer',
-  },
-];
-
-// ─── Biomarker LOINC / SNOMED Codes ─────────────────────────────────────────
-
-const BIOMARKER_CODES: Record<string, string[]> = {
-  kras: [
-    '55233-1',   // KRAS gene mutation analysis
-    '21717-0',   // KRAS codon 12/13 mutation
-    '79476-8',   // KRAS gene targeted mutation analysis
-    'LA9634-2',  // KRAS mutation present (answer code)
-  ],
-  egfr: [
-    '55201-8',   // EGFR gene mutation analysis
-    '85319-2',   // EGFR gene targeted mutation analysis in tumor
-    '21717-0',   // Alternate
-  ],
-  braf: [
-    '55233-1',   // Shared molecular panel (check display for BRAF)
-    '81287-0',   // BRAF gene targeted mutation analysis
-    '21717-0',   // Alternate
-  ],
-  her2: [
-    '85319-2',   // HER2/ERBB2 gene amplification
-    '72383-3',   // HER2 [Presence] in Tissue by FISH
-    '18474-7',   // HER2 [Presence] in Tissue by Immune stain
-  ],
-  msi: [
-    '81695-4',   // Microsatellite instability
-    '85062-8',   // MSI status by fragment analysis
-  ],
-};
-
-// ─── Treatment Procedure / Medication Codes ──────────────────────────────────
-
-const CHEMO_CODES = [
-  '367336001',  // Chemotherapy (SNOMED)
-  '385786002',  // Chemotherapy regimen
-  'C8648',      // NCI: Chemotherapy
-];
-
-const CHEMO_DRUG_PATTERNS = [
-  'folfox', 'folfiri', 'capecitabine', 'oxaliplatin', 'irinotecan',
-  'carboplatin', 'cisplatin', 'paclitaxel', 'docetaxel', 'gemcitabine',
-  'fluorouracil', '5-fu', 'cyclophosphamide', 'doxorubicin',
-];
-
-const IMMUNOTHERAPY_PATTERNS = [
-  'pembrolizumab', 'nivolumab', 'atezolizumab', 'durvalumab',
-  'ipilimumab', 'cemiplimab', 'keytruda', 'opdivo',
-];
-
-const TARGETED_PATTERNS = [
-  'osimertinib', 'erlotinib', 'gefitinib', 'afatinib', 'lapatinib',
-  'vemurafenib', 'dabrafenib', 'encorafenib', 'trametinib',
-  'cetuximab', 'panitumumab', 'bevacizumab', 'trastuzumab',
-  'pertuzumab', 'adagrasib', 'sotorasib', 'eras-0015', 'amivantamab',
-];
-
-const HORMONAL_PATTERNS = [
-  'tamoxifen', 'letrozole', 'anastrozole', 'exemestane',
-  'fulvestrant', 'leuprolide', 'bicalutamide', 'enzalutamide',
-];
-
-const RADIATION_CODES = [
-  '108290001',  // Radiation oncology (SNOMED)
-  '33195004',   // Radiation therapy procedure
-  '385798007',  // Radiation therapy regimen
-];
-
-const SURGERY_CODES = [
-  '387713003',  // Surgical procedure
-  '173171007',  // Colectomy
-  '456381000124102', // Resection of lung
-  '80146002',   // Appendectomy (Synthea often codes surgery here)
-];
-
-// ─── Helper Functions ─────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getAge(birthDate: string): number {
   const birth = new Date(birthDate);
@@ -263,362 +84,307 @@ function getAge(birthDate: string): number {
 
 function getCodes(concept?: FhirCodeableConcept): string[] {
   const codes: string[] = [];
-  if (concept?.coding) {
-    concept.coding.forEach(c => {
-      if (c.code) codes.push(c.code);
-      if (c.display) codes.push(c.display.toLowerCase());
-    });
-  }
+  concept?.coding?.forEach(c => { if (c.code) codes.push(c.code); if (c.display) codes.push(c.display.toLowerCase()); });
   if (concept?.text) codes.push(concept.text.toLowerCase());
   return codes;
 }
 
-function matchesCodes(concept: FhirCodeableConcept | undefined, patterns: string[]): boolean {
-  if (!concept) return false;
-  const codes = getCodes(concept);
-  return patterns.some(p => codes.some(c => c.toLowerCase().includes(p.toLowerCase())));
-}
-
 function detectCancerType(conditions: FhirCondition[]): string {
-  // Only look at active conditions
-  const active = conditions.filter(c => {
-    const status = getCodes(c.clinicalStatus);
-    return status.includes('active') || status.includes('active') || status.length === 0;
-  });
-
-  for (const condition of active) {
-    const codes = getCodes(condition.code);
-    for (const mapping of CANCER_CODE_MAP) {
-      if (mapping.patterns.some(p => codes.some(c => c.toUpperCase().startsWith(p) || c.includes(p.toLowerCase())))) {
-        return mapping.type;
-      }
+  for (const cond of conditions) {
+    const codes = getCodes(cond.code);
+    for (const m of CANCER_CODES) {
+      if (m.patterns.some(p => codes.some(c => c.toUpperCase().startsWith(p) || c.includes(p.toLowerCase())))) return m.type;
     }
   }
   return 'Advanced Solid Tumor';
 }
 
-function extractLabValue(observations: FhirObservation[], loincCode: string): number | null {
+function extractBiomarker(observations: FhirObservation[], biomarker: string): string {
+  const loincs = BIOMARKER_LOINC[biomarker] || [];
   const obs = observations.find(o => {
     const codes = getCodes(o.code);
-    return codes.includes(loincCode);
+    const display = o.code?.coding?.map(c => c.display?.toLowerCase() || '').join(' ') || '';
+    return loincs.some(l => codes.includes(l)) || display.includes(biomarker.toLowerCase());
   });
-  return obs?.valueQuantity?.value ?? null;
-}
-
-function extractBiomarker(observations: FhirObservation[], biomarker: string): string {
-  const codes = BIOMARKER_CODES[biomarker] || [];
-
-  const obs = observations.find(o => {
-    const obsCodes = getCodes(o.code);
-    const obsDisplay = o.code?.coding?.map(c => c.display?.toLowerCase() || '').join(' ') || '';
-    return codes.some(c => obsCodes.includes(c)) ||
-           obsDisplay.includes(biomarker.toLowerCase());
-  });
-
   if (!obs) return 'Not tested';
-
-  // Check valueCodeableConcept for positive/negative/mutant/wild-type
-  if (obs.valueCodeableConcept) {
-    const valueCodes = getCodes(obs.valueCodeableConcept);
-    const valueText = valueCodes.join(' ').toLowerCase();
-    if (valueText.includes('positive') || valueText.includes('mutant') ||
-        valueText.includes('present') || valueText.includes('detected')) {
-      return 'Positive';
-    }
-    if (valueText.includes('negative') || valueText.includes('wild') ||
-        valueText.includes('absent') || valueText.includes('not detected')) {
-      return 'Negative';
-    }
-  }
-
-  // Check valueString
+  const valCodes = getCodes(obs.valueCodeableConcept);
+  const valText = valCodes.join(' ').toLowerCase();
   if (obs.valueString) {
     const v = obs.valueString.toLowerCase();
-    if (v.includes('positive') || v.includes('mutant') || v.includes('detected')) return 'Positive';
-    if (v.includes('negative') || v.includes('wild') || v.includes('not detected')) return 'Negative';
+    if (v.includes('positive') || v.includes('mutant')) return 'Positive';
+    if (v.includes('negative') || v.includes('wild')) return 'Negative';
   }
-
+  if (valText.includes('positive') || valText.includes('mutant') || valText.includes('10828004')) return 'Positive';
+  if (valText.includes('negative') || valText.includes('wild') || valText.includes('260385009')) return 'Negative';
   return 'Not tested';
 }
 
-function detectPriorTreatments(
-  procedures: FhirProcedure[],
-  medications: FhirMedicationRequest[]
-): string[] {
-  const treatments = new Set<string>();
-
-  // Check procedures
-  for (const proc of procedures) {
-    if (proc.status === 'not-done') continue;
-    const display = proc.code?.coding?.map(c => c.display?.toLowerCase() || '').join(' ') || '';
-    const codes = getCodes(proc.code);
-
-    if (CHEMO_CODES.some(c => codes.includes(c)) ||
-        CHEMO_DRUG_PATTERNS.some(p => display.includes(p))) {
-      treatments.add('Chemotherapy');
-    }
-    if (RADIATION_CODES.some(c => codes.includes(c)) || display.includes('radiation')) {
-      treatments.add('Radiation');
-    }
-    if (SURGERY_CODES.some(c => codes.includes(c)) ||
-        display.includes('resection') || display.includes('surgery') ||
-        display.includes('excision') || display.includes('colectomy')) {
-      treatments.add('Surgery');
-    }
-    if (IMMUNOTHERAPY_PATTERNS.some(p => display.includes(p))) {
-      treatments.add('Immunotherapy');
-    }
-    if (TARGETED_PATTERNS.some(p => display.includes(p))) {
-      treatments.add('Targeted Therapy');
-    }
+function detectPriorTreatments(procedures: FhirProcedure[], meds: FhirMedicationRequest[]): string[] {
+  const tx = new Set<string>();
+  for (const p of procedures) {
+    if (p.status === 'not-done') continue;
+    const display = p.code?.coding?.map(c => c.display?.toLowerCase() || '').join(' ') || '';
+    const codes = getCodes(p.code);
+    if (CHEMO_CODES.some(c => codes.includes(c)) || CHEMO_PATTERNS.some(p => display.includes(p))) tx.add('Chemotherapy');
+    if (RADIATION_CODES.some(c => codes.includes(c)) || display.includes('radiation')) tx.add('Radiation');
+    if (SURGERY_CODES.some(c => codes.includes(c)) || display.includes('resection') || display.includes('surgery')) tx.add('Surgery');
+    if (IMMUNO_PATTERNS.some(p => display.includes(p))) tx.add('Immunotherapy');
+    if (TARGETED_PATTERNS.some(p => display.includes(p))) tx.add('Targeted Therapy');
+    if (HORMONAL_PATTERNS.some(p => display.includes(p))) tx.add('Hormonal Therapy');
   }
-
-  // Check medications
-  for (const med of medications) {
-    if (med.status === 'cancelled' || med.status === 'entered-in-error') continue;
-    const display = med.medicationCodeableConcept?.coding
-      ?.map(c => c.display?.toLowerCase() || '').join(' ') || '';
-    const text = (med.medicationCodeableConcept?.text || '').toLowerCase();
-    const fullText = `${display} ${text}`;
-
-    if (CHEMO_DRUG_PATTERNS.some(p => fullText.includes(p))) treatments.add('Chemotherapy');
-    if (IMMUNOTHERAPY_PATTERNS.some(p => fullText.includes(p))) treatments.add('Immunotherapy');
-    if (TARGETED_PATTERNS.some(p => fullText.includes(p))) treatments.add('Targeted Therapy');
-    if (HORMONAL_PATTERNS.some(p => fullText.includes(p))) treatments.add('Hormonal Therapy');
+  for (const m of meds) {
+    if (m.status === 'cancelled' || m.status === 'entered-in-error') continue;
+    const display = (m.medicationCodeableConcept?.coding?.map(c => c.display?.toLowerCase() || '').join(' ') || '') + ' ' + (m.medicationCodeableConcept?.text || '').toLowerCase();
+    if (CHEMO_PATTERNS.some(p => display.includes(p))) tx.add('Chemotherapy');
+    if (IMMUNO_PATTERNS.some(p => display.includes(p))) tx.add('Immunotherapy');
+    if (TARGETED_PATTERNS.some(p => display.includes(p))) tx.add('Targeted Therapy');
+    if (HORMONAL_PATTERNS.some(p => display.includes(p))) tx.add('Hormonal Therapy');
   }
-
-  return Array.from(treatments);
+  return Array.from(tx);
 }
 
-function getLastVisitDate(encounters: FhirEncounter[]): string {
-  const dates = encounters
-    .map(e => e.period?.end || e.period?.start)
-    .filter(Boolean) as string[];
+function latestLabValue(observations: FhirObservation[], loincCode: string): number | null {
+  const matches = observations
+    .filter(o => getCodes(o.code).includes(loincCode) && o.valueQuantity?.value != null)
+    .sort((a, b) => (b.effectiveDateTime || '').localeCompare(a.effectiveDateTime || ''));
+  return matches[0]?.valueQuantity?.value ?? null;
+}
+
+function getLastVisit(encounters: FhirEncounter[]): string {
+  const dates = encounters.map(e => e.period?.end || e.period?.start).filter(Boolean) as string[];
   if (!dates.length) return new Date().toISOString().split('T')[0];
   return dates.sort().reverse()[0].split('T')[0];
 }
 
-// ─── ERAS-0015 Matching Rules ─────────────────────────────────────────────────
+// ─── Trial Matching Rules ─────────────────────────────────────────────────────
 
-function matchEras(patient: Omit<TrialMatcherPatient, 'trialMatches' | 'bestMatch'>) {
-  const c = [];
+type BasePatient = Omit<TrialMatcherPatient, 'trialMatches' | 'bestMatch'>;
+type MatchResult = { score: number; status: 'LIKELY_ELIGIBLE' | 'REVIEW_REQUIRED' | 'EXCLUDED'; criteria: TrialMatcherPatient['trialMatches'][string]['criteria'] };
 
-  const ageOk = patient.age >= 18;
-  c.push({ criterion: 'Age ≥ 18', pass: ageOk, value: `Age: ${patient.age}`, type: 'include' as const });
-
-  c.push({ criterion: 'Advanced solid tumor', pass: true, value: patient.cancerType, type: 'include' as const });
-
-  const rasOk = patient.biomarkers.kras === 'Positive';
-  c.push({ criterion: 'RAS mutation (KRAS/NRAS/HRAS)', pass: rasOk, value: `KRAS: ${patient.biomarkers.kras}`, type: 'include' as const });
-
-  const hgbOk = (patient.labs.hemoglobin ?? 0) >= 8.0;
-  c.push({ criterion: 'ECOG 0–1 (Hgb proxy ≥ 8)', pass: hgbOk, value: `Hgb: ${patient.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const });
-
-  const hasPrior = patient.priorTreatments.length > 0;
-  c.push({ criterion: 'Prior systemic therapy', pass: hasPrior, value: hasPrior ? patient.priorTreatments.join(', ') : 'None documented', type: 'include' as const });
-
-  const labsOk = (patient.labs.ast ?? 999) <= 100 &&
-                 (patient.labs.alt ?? 999) <= 100 &&
-                 (patient.labs.creatinine ?? 999) <= 1.5 &&
-                 (patient.labs.platelets ?? 0) >= 100 &&
-                 hgbOk &&
-                 (patient.labs.wbc ?? 0) >= 1.5;
-  c.push({ criterion: 'Adequate organ function', pass: labsOk, value: `AST:${patient.labs.ast} ALT:${patient.labs.alt} Cr:${patient.labs.creatinine} Plt:${patient.labs.platelets} WBC:${patient.labs.wbc}`, type: 'include' as const });
-
-  c.push({ criterion: 'No prior RAS inhibitor', pass: null, value: 'Not determinable from FHIR data — manual review required', type: 'exclude_warn' as const });
-
-  const passes = c.filter(x => x.type === 'include').map(x => x.pass);
+function scoreAndStatus(criteria: MatchResult['criteria'], hardExclude: boolean): Pick<MatchResult, 'score' | 'status'> {
+  if (hardExclude) return { score: 0, status: 'EXCLUDED' };
+  const passes = criteria.filter(c => c.type === 'include').map(c => c.pass);
   const score = Math.round(passes.filter(Boolean).length / passes.length * 1000) / 10;
-
-  let status: 'LIKELY_ELIGIBLE' | 'REVIEW_REQUIRED' | 'EXCLUDED';
-  if (!rasOk) status = 'EXCLUDED';
-  else if (score >= 83) status = 'LIKELY_ELIGIBLE';
-  else if (score >= 50) status = 'REVIEW_REQUIRED';
-  else status = 'EXCLUDED';
-
-  return { score, status, criteria: c };
+  const status = score >= 83 ? 'LIKELY_ELIGIBLE' : score >= 50 ? 'REVIEW_REQUIRED' : 'EXCLUDED';
+  return { score, status };
 }
 
-function matchMariposa(patient: Omit<TrialMatcherPatient, 'trialMatches' | 'bestMatch'>) {
-  const c = [];
-
-  const ageOk = patient.age >= 18;
-  c.push({ criterion: 'Age ≥ 18', pass: ageOk, value: `Age: ${patient.age}`, type: 'include' as const });
-
-  const nsclc = patient.cancerType === 'Lung Cancer';
-  c.push({ criterion: 'NSCLC tumor type', pass: nsclc, value: patient.cancerType, type: 'include' as const });
-
-  const egfr = patient.biomarkers.egfr === 'Positive';
-  c.push({ criterion: 'EGFR mutation', pass: egfr, value: `EGFR: ${patient.biomarkers.egfr}`, type: 'include' as const });
-
-  const hgbOk = (patient.labs.hemoglobin ?? 0) >= 9.0;
-  c.push({ criterion: 'ECOG 0–1 (Hgb proxy ≥ 9)', pass: hgbOk, value: `Hgb: ${patient.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const });
-
-  const priorTki = patient.priorTreatments.includes('Targeted Therapy');
-  c.push({ criterion: 'Prior EGFR TKI (osimertinib)', pass: priorTki, value: `Targeted: ${priorTki ? 'Yes' : 'No'}`, type: 'include' as const });
-
-  const labsOk = (patient.labs.ast ?? 999) <= 90 &&
-                 (patient.labs.alt ?? 999) <= 90 &&
-                 (patient.labs.creatinine ?? 999) <= 1.5 &&
-                 (patient.labs.platelets ?? 0) >= 75 &&
-                 hgbOk &&
-                 (patient.labs.wbc ?? 0) >= 2.0;
-  c.push({ criterion: 'Adequate organ function', pass: labsOk, value: `AST:${patient.labs.ast} ALT:${patient.labs.alt} Cr:${patient.labs.creatinine} Plt:${patient.labs.platelets} WBC:${patient.labs.wbc}`, type: 'include' as const });
-
-  c.push({ criterion: 'No active CNS metastases', pass: null, value: 'CNS status not in FHIR data — manual review required', type: 'exclude_warn' as const });
-
-  const passes = c.filter(x => x.type === 'include').map(x => x.pass);
-  const score = Math.round(passes.filter(Boolean).length / passes.length * 1000) / 10;
-
-  let status: 'LIKELY_ELIGIBLE' | 'REVIEW_REQUIRED' | 'EXCLUDED';
-  if (!nsclc || !egfr) status = 'EXCLUDED';
-  else if (score >= 83) status = 'LIKELY_ELIGIBLE';
-  else if (score >= 50) status = 'REVIEW_REQUIRED';
-  else status = 'EXCLUDED';
-
-  return { score, status, criteria: c };
+function matchEras(p: BasePatient): MatchResult {
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 8;
+  const labsOk = (p.labs.ast ?? 999) <= 100 && (p.labs.alt ?? 999) <= 100 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 100 && hgbOk && (p.labs.wbc ?? 0) >= 1.5;
+  const rasOk = p.biomarkers.kras === 'Positive';
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Advanced solid tumor', pass: true, value: p.cancerType, type: 'include' as const },
+    { criterion: 'RAS mutation (KRAS/NRAS/HRAS)', pass: rasOk, value: `KRAS: ${p.biomarkers.kras}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 8)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: 'Prior systemic therapy', pass: p.priorTreatments.length > 0, value: p.priorTreatments.join(', ') || 'None documented', type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No prior RAS inhibitor', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !rasOk) };
 }
 
-function matchBreakwater(patient: Omit<TrialMatcherPatient, 'trialMatches' | 'bestMatch'>) {
-  const c = [];
-
-  const ageOk = patient.age >= 18;
-  c.push({ criterion: 'Age ≥ 18', pass: ageOk, value: `Age: ${patient.age}`, type: 'include' as const });
-
-  const crc = patient.cancerType === 'Colorectal Cancer';
-  c.push({ criterion: 'Metastatic colorectal cancer', pass: crc, value: patient.cancerType, type: 'include' as const });
-
-  const braf = patient.biomarkers.braf === 'Positive';
-  c.push({ criterion: 'BRAF V600E mutation', pass: braf, value: `BRAF: ${patient.biomarkers.braf}`, type: 'include' as const });
-
-  const rasNeg = patient.biomarkers.kras !== 'Positive';
-  c.push({ criterion: 'RAS wild-type (KRAS/NRAS neg)', pass: rasNeg, value: `KRAS: ${patient.biomarkers.kras}`, type: 'include' as const });
-
-  const hgbOk = (patient.labs.hemoglobin ?? 0) >= 9.0;
-  c.push({ criterion: 'ECOG 0–1 (Hgb proxy ≥ 9)', pass: hgbOk, value: `Hgb: ${patient.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const });
-
-  const labsOk = (patient.labs.ast ?? 999) <= 90 &&
-                 (patient.labs.alt ?? 999) <= 90 &&
-                 (patient.labs.creatinine ?? 999) <= 1.5 &&
-                 (patient.labs.platelets ?? 0) >= 75 &&
-                 hgbOk &&
-                 (patient.labs.wbc ?? 0) >= 2.0;
-  c.push({ criterion: 'Adequate organ function', pass: labsOk, value: `AST:${patient.labs.ast} ALT:${patient.labs.alt} Cr:${patient.labs.creatinine} Plt:${patient.labs.platelets} WBC:${patient.labs.wbc}`, type: 'include' as const });
-
-  c.push({ criterion: 'No prior BRAF inhibitor', pass: null, value: 'Not determinable from FHIR data — manual review required', type: 'exclude_warn' as const });
-
-  const passes = c.filter(x => x.type === 'include').map(x => x.pass);
-  const score = Math.round(passes.filter(Boolean).length / passes.length * 1000) / 10;
-
-  let status: 'LIKELY_ELIGIBLE' | 'REVIEW_REQUIRED' | 'EXCLUDED';
-  if (!crc || !braf) status = 'EXCLUDED';
-  else if (score >= 83) status = 'LIKELY_ELIGIBLE';
-  else if (score >= 50) status = 'REVIEW_REQUIRED';
-  else status = 'EXCLUDED';
-
-  return { score, status, criteria: c };
+function matchMariposa(p: BasePatient): MatchResult {
+  const nsclc = p.cancerType === 'Lung Cancer'; const egfr = p.biomarkers.egfr === 'Positive';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'NSCLC tumor type', pass: nsclc, value: p.cancerType, type: 'include' as const },
+    { criterion: 'EGFR mutation', pass: egfr, value: `EGFR: ${p.biomarkers.egfr}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: 'Prior EGFR TKI (osimertinib)', pass: p.priorTreatments.includes('Targeted Therapy'), value: `Targeted: ${p.priorTreatments.includes('Targeted Therapy') ? 'Yes' : 'No'}`, type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No active CNS metastases', pass: null, value: 'CNS status not in FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !nsclc || !egfr) };
 }
 
-// ─── Main Export: Parse a Single FHIR Bundle ────────────────────────────────
+function matchBreakwater(p: BasePatient): MatchResult {
+  const crc = p.cancerType === 'Colorectal Cancer'; const braf = p.biomarkers.braf === 'Positive'; const rasNeg = p.biomarkers.kras !== 'Positive';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Metastatic colorectal cancer', pass: crc, value: p.cancerType, type: 'include' as const },
+    { criterion: 'BRAF V600E mutation', pass: braf, value: `BRAF: ${p.biomarkers.braf}`, type: 'include' as const },
+    { criterion: 'RAS wild-type (KRAS/NRAS neg)', pass: rasNeg, value: `KRAS: ${p.biomarkers.kras}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No prior BRAF inhibitor', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !crc || !braf) };
+}
+
+function matchKeynote(p: BasePatient): MatchResult {
+  const msi = p.biomarkers.msi === 'Positive';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Advanced solid tumor (any type)', pass: true, value: p.cancerType, type: 'include' as const },
+    { criterion: 'MSI-H or dMMR tumor', pass: msi, value: `MSI: ${p.biomarkers.msi}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: '>= 1 prior line of therapy', pass: p.priorTreatments.length > 0, value: p.priorTreatments.join(', ') || 'None documented', type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No prior anti-PD-1/PD-L1 therapy', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !msi) };
+}
+
+function matchMonarch(p: BasePatient): MatchResult {
+  const breast = p.cancerType === 'Breast Cancer'; const erPos = p.biomarkers.er === 'Positive'; const her2Neg = p.biomarkers.her2 !== 'Positive';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Metastatic breast cancer', pass: breast, value: p.cancerType, type: 'include' as const },
+    { criterion: 'HR-positive (ER+ or PR+)', pass: erPos, value: `ER: ${p.biomarkers.er} PR: ${p.biomarkers.pr}`, type: 'include' as const },
+    { criterion: 'HER2-negative', pass: her2Neg, value: `HER2: ${p.biomarkers.her2}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No prior CDK4/6 inhibitor', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !breast || !erPos) };
+}
+
+function matchDestinyBreast(p: BasePatient): MatchResult {
+  const breast = p.cancerType === 'Breast Cancer'; const her2Pos = p.biomarkers.her2 === 'Positive';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Metastatic breast cancer', pass: breast, value: p.cancerType, type: 'include' as const },
+    { criterion: 'HER2-positive (IHC 3+ or FISH+)', pass: her2Pos, value: `HER2: ${p.biomarkers.her2}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: '>= 1 prior line of therapy', pass: p.priorTreatments.length > 0, value: p.priorTreatments.join(', ') || 'None documented', type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No prior T-DXd (trastuzumab deruxtecan)', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !breast || !her2Pos) };
+}
+
+function matchMasterkey(p: BasePatient): MatchResult {
+  const melanoma = p.cancerType === 'Melanoma'; const braf = p.biomarkers.braf === 'Positive';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Unresectable or metastatic melanoma', pass: melanoma, value: p.cancerType, type: 'include' as const },
+    { criterion: 'BRAF V600E/K mutation', pass: braf, value: `BRAF: ${p.biomarkers.braf}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No prior anti-PD-1 therapy', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+    { criterion: 'No prior BRAF/MEK inhibitor', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !melanoma || !braf) };
+}
+
+function matchZenith(p: BasePatient): MatchResult {
+  const nsclc = p.cancerType === 'Lung Cancer'; const egfr = p.biomarkers.egfr === 'Positive';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Metastatic NSCLC', pass: nsclc, value: p.cancerType, type: 'include' as const },
+    { criterion: 'EGFR exon 20 insertion mutation', pass: egfr, value: `EGFR: ${p.biomarkers.egfr} (exon 20 subtype — manual confirm)`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: '>= 1 prior platinum-based therapy', pass: p.priorTreatments.includes('Chemotherapy') || p.priorTreatments.includes('Targeted Therapy'), value: p.priorTreatments.join(', ') || 'None', type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No prior EGFR exon 20 inhibitor', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !nsclc || !egfr) };
+}
+
+function matchProdige(p: BasePatient): MatchResult {
+  const pdac = p.cancerType === 'Pancreatic Cancer';
+  const hgbOk = (p.labs.hemoglobin ?? 0) >= 9;
+  const labsOk = (p.labs.ast ?? 999) <= 90 && (p.labs.alt ?? 999) <= 90 && (p.labs.creatinine ?? 999) <= 1.5 && (p.labs.platelets ?? 0) >= 75 && hgbOk && (p.labs.wbc ?? 0) >= 2;
+  const priorChemo = p.priorTreatments.includes('Chemotherapy');
+  const criteria = [
+    { criterion: 'Age >= 18', pass: p.age >= 18, value: `Age: ${p.age}`, type: 'include' as const },
+    { criterion: 'Metastatic pancreatic adenocarcinoma', pass: pdac, value: p.cancerType, type: 'include' as const },
+    { criterion: 'Prior gemcitabine-based chemotherapy', pass: priorChemo, value: `Chemo: ${priorChemo ? 'Yes' : 'No'}`, type: 'include' as const },
+    { criterion: 'ECOG 0-1 (Hgb >= 9)', pass: hgbOk, value: `Hgb: ${p.labs.hemoglobin ?? 'N/A'} g/dL`, type: 'include' as const },
+    { criterion: 'Adequate organ function', pass: labsOk, value: `AST:${p.labs.ast} ALT:${p.labs.alt} Cr:${p.labs.creatinine} Plt:${p.labs.platelets} WBC:${p.labs.wbc}`, type: 'include' as const },
+    { criterion: 'No active biliary obstruction', pass: null, value: 'Not determinable from FHIR — manual review', type: 'exclude_warn' as const },
+  ];
+  return { criteria, ...scoreAndStatus(criteria, !pdac) };
+}
+
+const TRIAL_MATCHERS: Record<string, (p: BasePatient) => MatchResult> = {
+  NCT06983743: matchEras,
+  NCT04093167: matchMariposa,
+  NCT04657003: matchBreakwater,
+  NCT02628067: matchKeynote,
+  NCT02422615: matchMonarch,
+  NCT04494425: matchDestinyBreast,
+  NCT02263508: matchMasterkey,
+  NCT03318939: matchZenith,
+  NCT03539536: matchProdige,
+};
+
+// ─── Main Export ──────────────────────────────────────────────────────────────
 
 export function parseFhirBundle(bundle: FhirBundle): TrialMatcherPatient | null {
   if (bundle.resourceType !== 'Bundle' || !bundle.entry) return null;
-
   const resources = bundle.entry.map(e => e.resource).filter(Boolean) as FhirResource[];
+  const patient = resources.find(r => r.resourceType === 'Patient') as FhirPatient | undefined;
+  if (!patient?.birthDate) return null;
 
-  const patient    = resources.find(r => r.resourceType === 'Patient') as FhirPatient | undefined;
-  const conditions = resources.filter(r => r.resourceType === 'Condition') as FhirCondition[];
+  const conditions  = resources.filter(r => r.resourceType === 'Condition') as FhirCondition[];
   const observations = resources.filter(r => r.resourceType === 'Observation') as FhirObservation[];
-  const procedures = resources.filter(r => r.resourceType === 'Procedure') as FhirProcedure[];
+  const procedures  = resources.filter(r => r.resourceType === 'Procedure') as FhirProcedure[];
   const medications = resources.filter(r => r.resourceType === 'MedicationRequest') as FhirMedicationRequest[];
-  const encounters = resources.filter(r => r.resourceType === 'Encounter') as FhirEncounter[];
-
-  if (!patient || !patient.birthDate) return null;
+  const encounters  = resources.filter(r => r.resourceType === 'Encounter') as FhirEncounter[];
 
   const patientId = patient.identifier?.find(i => i.system === 'urn:trialmatchrx:patient')?.value
     || patient.id
     || `FHIR-${Math.random().toString(36).slice(2, 9).toUpperCase()}`;
 
-  // ── Demographics
-  const age = getAge(patient.birthDate);
-  const sex = patient.gender === 'female' ? 'Female' : patient.gender === 'male' ? 'Male' : 'Unknown';
-
-  // ── Cancer type from conditions
-  const cancerType = detectCancerType(conditions);
-
-  // ── Labs — use most recent value for each LOINC code
-  const latestObs = (loincCode: string): number | null => {
-    const matches = observations
-      .filter(o => getCodes(o.code).includes(loincCode) && o.valueQuantity?.value != null)
-      .sort((a, b) => (b.effectiveDateTime || '').localeCompare(a.effectiveDateTime || ''));
-    return matches[0]?.valueQuantity?.value ?? null;
+  const base: BasePatient = {
+    patientId,
+    age: getAge(patient.birthDate),
+    sex: patient.gender === 'female' ? 'Female' : patient.gender === 'male' ? 'Male' : 'Unknown',
+    cancerType: detectCancerType(conditions),
+    biomarkers: {
+      kras: extractBiomarker(observations, 'kras'),
+      egfr: extractBiomarker(observations, 'egfr'),
+      braf: extractBiomarker(observations, 'braf'),
+      her2: extractBiomarker(observations, 'her2'),
+      msi:  extractBiomarker(observations, 'msi'),
+      er:   extractBiomarker(observations, 'er'),
+      pr:   extractBiomarker(observations, 'pr'),
+    },
+    labs: {
+      ast:        latestLabValue(observations, '1920-8'),
+      alt:        latestLabValue(observations, '1742-6'),
+      creatinine: latestLabValue(observations, '2160-0'),
+      hemoglobin: latestLabValue(observations, '718-7'),
+      platelets:  latestLabValue(observations, '777-3'),
+      wbc:        latestLabValue(observations, '6690-2') ?? latestLabValue(observations, '26464-8'),
+    },
+    priorTreatments: detectPriorTreatments(procedures, medications),
+    lastVisit: getLastVisit(encounters),
   };
 
-  const labs = {
-    ast:        latestObs('1920-8'),
-    alt:        latestObs('1742-6'),
-    creatinine: latestObs('2160-0'),
-    hemoglobin: latestObs('718-7'),
-    platelets:  latestObs('777-3'),
-    wbc:        latestObs('6690-2') ?? latestObs('26464-8'),
-  };
-
-  // ── Biomarkers
-  const biomarkers = {
-    kras: extractBiomarker(observations, 'kras'),
-    egfr: extractBiomarker(observations, 'egfr'),
-    braf: extractBiomarker(observations, 'braf'),
-    her2: extractBiomarker(observations, 'her2'),
-    msi:  extractBiomarker(observations, 'msi'),
-  };
-
-  // ── Prior treatments
-  const priorTreatments = detectPriorTreatments(procedures, medications);
-
-  // ── Last visit
-  const lastVisit = getLastVisitDate(encounters);
-
-  // ── Build base patient (without trial matches)
-  const base = { patientId, age, sex, cancerType, biomarkers, labs, priorTreatments, lastVisit };
-
-  // ── Run trial matching rules
-  const t1 = matchEras(base);
-  const t2 = matchMariposa(base);
-  const t3 = matchBreakwater(base);
-
-  const trialMatches = {
-    NCT06983743: t1,
-    NCT04093167: t2,
-    NCT04657003: t3,
-  };
+  const trialMatches = Object.fromEntries(
+    Object.entries(TRIAL_MATCHERS).map(([nct, fn]) => [nct, fn(base)])
+  );
 
   const statusOrder: Record<string, number> = { LIKELY_ELIGIBLE: 3, REVIEW_REQUIRED: 2, EXCLUDED: 1 };
   const best = Object.entries(trialMatches)
     .sort((a, b) => statusOrder[b[1].status] - statusOrder[a[1].status] || b[1].score - a[1].score)[0];
 
-  return {
-    ...base,
-    trialMatches,
-    bestMatch: { trialId: best[0], score: best[1].score, status: best[1].status },
-  };
+  return { ...base, trialMatches, bestMatch: { trialId: best[0], score: best[1].score, status: best[1].status } };
 }
-
-// ─── Parse Multiple Bundles (browser / API route) ────────────────────────────
 
 export function parseFhirBundles(bundles: FhirBundle[]): TrialMatcherPatient[] {
-  return bundles
-    .map(parseFhirBundle)
-    .filter((p): p is TrialMatcherPatient => p !== null);
+  return bundles.map(parseFhirBundle).filter((p): p is TrialMatcherPatient => p !== null);
 }
 
-// ─── Parse from JSON strings (useful for file uploads in the browser) ────────
-
 export function parseFhirBundleJson(json: string): TrialMatcherPatient | null {
-  try {
-    const bundle = JSON.parse(json) as FhirBundle;
-    return parseFhirBundle(bundle);
-  } catch {
-    console.error('[fhirAdapter] Failed to parse FHIR bundle JSON');
-    return null;
-  }
+  try { return parseFhirBundle(JSON.parse(json) as FhirBundle); }
+  catch { return null; }
 }
