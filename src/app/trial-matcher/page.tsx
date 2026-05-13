@@ -14,6 +14,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import IRBLogExport from '@/components/IRBLogExport';
 import {
   Search,
   CheckCircle2,
@@ -661,14 +662,13 @@ export default function TrialMatcherPage() {
                 </Link>
               )}
 
-              {/* PDF export */}
-              <button
-                onClick={() => generateTrialReport(TRIALS[activeTrial], patients)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
-                title="Export trial prescreen report as PDF"
-              >
-                <Download className="w-3.5 h-3.5" /> Export PDF
-              </button>
+              {/* IRB Export dropdown */}
+              <IRBLogExport
+                trial={TRIALS[activeTrial]}
+                trials={TRIALS}
+                patients={patients}
+                selectedPatient={selectedPt}
+              />
 
               {/* Notification bell */}
               <div className="relative">
