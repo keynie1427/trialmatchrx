@@ -1,37 +1,14 @@
 'use client';
 
 // src/app/trial-matcher/page.tsx
-//
-// EMR-driven clinical trial matching dashboard.
-// Access controlled via Firestore email whitelist (trial_matcher_users collection).
-//
-// Auth flow:
-//   1. Not logged in        → redirect to /login?next=/trial-matcher
-//   2. Logged in, checking  → loading spinner
-//   3. Email not whitelisted → redirect to /trial-matcher/access-denied
-//   4. Email whitelisted    → render dashboard with role from Firestore
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Dna,
-  FlaskConical,
-  Stethoscope,
-  ClipboardList,
-  LayoutGrid,
-  List,
-  ExternalLink,
-  Users,
-  LogOut,
-  Loader2,
-  Download,
-  Bell,
-  ShieldCheck,
+  Search, CheckCircle2, XCircle, AlertTriangle, Dna, FlaskConical,
+  Stethoscope, ClipboardList, LayoutGrid, List, ExternalLink,
+  Users, LogOut, Loader2, Download, Bell, ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -40,24 +17,13 @@ import { auth } from '@/lib/firebase';
 import { checkTrialMatcherAccess, type TrialMatcherRole, type TrialMatcherUser } from '@/lib/trialMatcherAuth';
 import { generateTrialReport, generatePatientReport } from '@/lib/trialMatcherPdf';
 import {
-  PATIENTS as STATIC_PATIENTS,
-  TRIALS,
-  STATUS_CONFIG,
-  type TrialMatcherPatient,
-  type MatchStatus,
-  type TrialDefinition,
+  PATIENTS as STATIC_PATIENTS, TRIALS, STATUS_CONFIG,
+  type TrialMatcherPatient, type MatchStatus, type TrialDefinition,
 } from '@/lib/trialMatcherData';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 const CANCER_EMOJI: Record<string, string> = {
-  'Lung Cancer': '🫁',
-  'Colorectal Cancer': '🔬',
-  'Breast Cancer': '🩷',
-  'Pancreatic Cancer': '🔶',
-  'Prostate Cancer': '🔵',
-  'Melanoma': '🟤',
-  'Ovarian Cancer': '🟣',
+  'Lung Cancer': '🫁', 'Colorectal Cancer': '🔬', 'Breast Cancer': '🩷',
+  'Pancreatic Cancer': '🔶', 'Prostate Cancer': '🔵', 'Melanoma': '🟤', 'Ovarian Cancer': '🟣',
 };
 
 const BIOMARKER_COLORS: Record<string, { bg: string; text: string }> = {
@@ -68,7 +34,7 @@ const BIOMARKER_COLORS: Record<string, { bg: string; text: string }> = {
   msi:  { bg: 'bg-purple-100 dark:bg-purple-900/30',  text: 'text-purple-800 dark:text-purple-300' },
 };
 
-// ─── Auth Gate ────────────────────────────────────────────────────────────────
+type AllTrials = Record<string, TrialDefinition>;
 
 function AuthLoadingScreen() {
   return (
@@ -78,8 +44,6 @@ function AuthLoadingScreen() {
     </div>
   );
 }
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: MatchStatus }) {
   const cfg = STATUS_CONFIG[status];
@@ -98,15 +62,11 @@ function ScoreRing({ score, status, size = 44 }: { score: number; status: MatchS
   const dash = (score / 100) * circ;
   return (
     <svg width={size} height={size} className="flex-shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={4} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke={cfg.barColor} strokeWidth={4}
-        strokeDasharray={`${dash.toFixed(1)} ${circ.toFixed(1)}`}
-        strokeLinecap="round"
-        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-      />
-      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={4} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={cfg.barColor} strokeWidth={4}
+        strokeDasharray={`${dash.toFixed(1)} ${circ.toFixed(1)}`} strokeLinecap="round"
+        transform={`rotate(-90 ${size/2} ${size/2})`} />
+      <text x={size/2} y={size/2} textAnchor="middle" dominantBaseline="central"
         style={{ fontSize: 10, fontWeight: 800, fill: cfg.barColor }}>
         {Math.round(score)}
       </text>
@@ -143,9 +103,9 @@ function CriteriaList({ criteria }: { criteria: TrialMatcherPatient['trialMatche
         return (
           <div key={i} className={`flex gap-3 p-2.5 rounded-lg border ${bg}`}>
             <div className="mt-0.5 flex-shrink-0">
-              {c.pass === true  && <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
-              {c.pass === false && <XCircle      className="w-4 h-4 text-red-600 dark:text-red-400" />}
-              {c.pass === null  && <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
+              {c.pass === true  && <CheckCircle2  className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+              {c.pass === false && <XCircle        className="w-4 h-4 text-red-600 dark:text-red-400" />}
+              {c.pass === null  && <AlertTriangle  className="w-4 h-4 text-amber-600 dark:text-amber-400" />}
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">{c.criterion}</p>
@@ -158,7 +118,13 @@ function CriteriaList({ criteria }: { criteria: TrialMatcherPatient['trialMatche
   );
 }
 
-function LabCard({ name, value, unit, flagged }: { name: string; value: number; unit: string; flagged: boolean }) {
+function LabCard({ name, value, unit, flagged }: { name: string; value: number | null; unit: string; flagged: boolean }) {
+  if (value === null || value === undefined) return (
+    <div className="rounded-lg p-2.5 border bg-surface-50 dark:bg-surface-800/50 border-surface-200 dark:border-surface-700">
+      <p className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">{name}</p>
+      <p className="text-sm font-bold mt-0.5 text-surface-400">N/A</p>
+    </div>
+  );
   return (
     <div className={`rounded-lg p-2.5 border ${flagged
       ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/40'
@@ -204,6 +170,7 @@ function PatientRow({ patient, activeTrial, selected, onClick }: {
   patient: TrialMatcherPatient; activeTrial: string; selected: boolean; onClick: () => void;
 }) {
   const td = patient.trialMatches[activeTrial];
+  if (!td) return null;
   const cfg = STATUS_CONFIG[td.status];
   return (
     <motion.div layout initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
@@ -243,19 +210,20 @@ function PatientRow({ patient, activeTrial, selected, onClick }: {
   );
 }
 
-function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
+// DetailPanel receives allTrials as a prop to avoid closure issues
+function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode, allTrials, onPatientReport }: {
   patient: TrialMatcherPatient | null;
   detailTrialId: string;
   onTrialSelect: (id: string) => void;
-  viewMode: TrialMatcherRole;
+  viewMode: string;
+  allTrials: AllTrials;
+  onPatientReport: (p: TrialMatcherPatient) => void;
 }) {
   if (!patient) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-12 text-surface-400">
         <Dna className="w-12 h-12 mx-auto mb-4 opacity-30" />
-        <p className="text-base font-semibold text-surface-500 dark:text-surface-400">
-          Select a patient to view eligibility
-        </p>
+        <p className="text-base font-semibold text-surface-500 dark:text-surface-400">Select a patient to view eligibility</p>
         <p className="text-sm mt-1">Criteria evaluated automatically from EMR data</p>
       </div>
     );
@@ -263,19 +231,17 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
 
   const ptTrialData = patient.trialMatches[detailTrialId];
   const detailTrial = allTrials[detailTrialId];
+  if (!ptTrialData) return null;
 
   return (
     <div className="flex-1 overflow-y-auto p-5">
-      {/* Patient header */}
       <div className="flex items-start gap-4 mb-6">
         <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl flex-shrink-0"
-          style={{ background: allTrials[detailTrialId]?.colorLight }}>
+          style={{ background: allTrials[detailTrialId]?.colorLight || '#f3f4f6' }}>
           {CANCER_EMOJI[patient.cancerType] || '🔬'}
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">
-            {patient.patientId}
-          </h2>
+          <h2 className="font-display text-xl font-bold text-surface-900 dark:text-surface-100">{patient.patientId}</h2>
           <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
             {patient.cancerType} · {patient.age}y {patient.sex} · Last visit: {patient.lastVisit}
           </p>
@@ -283,13 +249,11 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
         </div>
       </div>
 
-      {/* Trial overview (all 3) */}
-      <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3">
-        Trial match overview
-      </h3>
+      <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3">Trial match overview</h3>
       <div className="grid grid-cols-3 gap-3 mb-6">
         {Object.values(allTrials).map((t) => {
           const td = patient.trialMatches[t.nctId];
+          if (!td) return null;
           const isActive = detailTrialId === t.nctId;
           return (
             <button key={t.nctId} onClick={() => onTrialSelect(t.nctId)}
@@ -308,45 +272,35 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
         })}
       </div>
 
-      {/* Criteria */}
       <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3">
         Eligibility criteria — {detailTrial?.name}
       </h3>
       <CriteriaList criteria={ptTrialData.criteria} />
 
-      {/* Labs — CRC only */}
       {viewMode === 'crc' && (
         <>
-          <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3 mt-5">
-            Lab values
-          </h3>
+          <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3 mt-5">Lab values</h3>
           <div className="grid grid-cols-3 gap-2">
-            <LabCard name="AST"        value={patient.labs.ast}        unit="U/L"    flagged={patient.labs.ast > 100} />
-            <LabCard name="ALT"        value={patient.labs.alt}        unit="U/L"    flagged={patient.labs.alt > 100} />
-            <LabCard name="Creatinine" value={patient.labs.creatinine} unit="mg/dL"  flagged={patient.labs.creatinine > 1.5} />
-            <LabCard name="Hemoglobin" value={patient.labs.hemoglobin} unit="g/dL"   flagged={patient.labs.hemoglobin < 8} />
-            <LabCard name="Platelets"  value={patient.labs.platelets}  unit="10⁹/L"  flagged={patient.labs.platelets < 75} />
-            <LabCard name="WBC"        value={patient.labs.wbc}        unit="10⁹/L"  flagged={patient.labs.wbc < 1.5} />
+            <LabCard name="AST"        value={patient.labs.ast}        unit="U/L"    flagged={(patient.labs.ast ?? 0) > 100} />
+            <LabCard name="ALT"        value={patient.labs.alt}        unit="U/L"    flagged={(patient.labs.alt ?? 0) > 100} />
+            <LabCard name="Creatinine" value={patient.labs.creatinine} unit="mg/dL"  flagged={(patient.labs.creatinine ?? 0) > 1.5} />
+            <LabCard name="Hemoglobin" value={patient.labs.hemoglobin} unit="g/dL"   flagged={(patient.labs.hemoglobin ?? 99) < 8} />
+            <LabCard name="Platelets"  value={patient.labs.platelets}  unit="10⁹/L"  flagged={(patient.labs.platelets ?? 999) < 75} />
+            <LabCard name="WBC"        value={patient.labs.wbc}        unit="10⁹/L"  flagged={(patient.labs.wbc ?? 999) < 1.5} />
           </div>
         </>
       )}
 
-      {/* Prior treatments */}
-      <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3 mt-5">
-        Prior treatments
-      </h3>
+      <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3 mt-5">Prior treatments</h3>
       <div className="flex flex-wrap gap-2">
         {patient.priorTreatments.length > 0
           ? patient.priorTreatments.map((t) => (
-              <span key={t} className="text-xs px-3 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-surface-700">
-                {t}
-              </span>
+              <span key={t} className="text-xs px-3 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 border border-surface-200 dark:border-surface-700">{t}</span>
             ))
           : <span className="text-xs text-surface-400">None documented</span>
         }
       </div>
 
-      {/* Action box */}
       <div className="mt-5">
         {ptTrialData.status === 'LIKELY_ELIGIBLE' && (
           <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
@@ -365,8 +319,7 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
         {ptTrialData.status === 'REVIEW_REQUIRED' && (
           <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
             <p className="text-sm font-bold text-amber-800 dark:text-amber-300 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Manual review required
+              <AlertTriangle className="w-4 h-4" /> Manual review required
             </p>
             <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5 leading-relaxed">
               One or more criteria could not be resolved from available EMR data. Review ⚠ flagged items above before pre-screening contact.
@@ -376,8 +329,7 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
         {ptTrialData.status === 'EXCLUDED' && (
           <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
             <p className="text-sm font-bold text-red-800 dark:text-red-300 flex items-center gap-2">
-              <XCircle className="w-4 h-4" />
-              Excluded from {detailTrial?.shortName}
+              <XCircle className="w-4 h-4" /> Excluded from {detailTrial?.shortName}
             </p>
             <p className="text-xs text-red-700 dark:text-red-400 mt-1.5 leading-relaxed">
               Patient does not meet one or more hard inclusion criteria. Check other trials for a potential match.
@@ -386,18 +338,13 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
         )}
       </div>
 
-      {/* NCT link + patient PDF */}
       <div className="mt-4 pt-4 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between">
-        <a href={`https://clinicaltrials.gov/study/${detailTrialId}`}
-          target="_blank" rel="noopener noreferrer"
+        <a href={`https://clinicaltrials.gov/study/${detailTrialId}`} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-xs text-primary-600 dark:text-primary-400 hover:underline">
-          <ExternalLink className="w-3 h-3" />
-          View {detailTrialId} on ClinicalTrials.gov
+          <ExternalLink className="w-3 h-3" /> View {detailTrialId} on ClinicalTrials.gov
         </a>
-        <button
-          onClick={() => generatePatientReport(patient, allTrials)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 transition-colors"
-        >
+        <button onClick={() => onPatientReport(patient)}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 transition-colors">
           <Download className="w-3 h-3" /> Patient report
         </button>
       </div>
@@ -405,9 +352,10 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
   );
 }
 
-function CompareTable({ patients, onSelect }: {
+function CompareTable({ patients, onSelect, allTrials }: {
   patients: TrialMatcherPatient[];
   onSelect: (p: TrialMatcherPatient) => void;
+  allTrials: AllTrials;
 }) {
   const trialIds = Object.keys(allTrials);
   return (
@@ -420,8 +368,8 @@ function CompareTable({ patients, onSelect }: {
             <th className="text-left p-3 font-semibold text-surface-600 dark:text-surface-400 border-b border-surface-200 dark:border-surface-700">Age / Sex</th>
             {trialIds.map((id) => (
               <th key={id} className="text-left p-3 font-semibold border-b border-surface-200 dark:border-surface-700"
-                style={{ color: allTrials[id].color }}>
-                {allTrials[id].shortName}
+                style={{ color: allTrials[id]?.color }}>
+                {allTrials[id]?.shortName}
               </th>
             ))}
             <th className="text-left p-3 font-semibold text-surface-600 dark:text-surface-400 border-b border-surface-200 dark:border-surface-700">Best match</th>
@@ -434,14 +382,18 @@ function CompareTable({ patients, onSelect }: {
               <td className="p-3 font-bold text-surface-900 dark:text-surface-100">{p.patientId}</td>
               <td className="p-3 text-surface-600 dark:text-surface-400">{CANCER_EMOJI[p.cancerType] || '🔬'} {p.cancerType}</td>
               <td className="p-3 text-surface-600 dark:text-surface-400">{p.age}y {p.sex[0]}</td>
-              {trialIds.map((id) => (
-                <td key={id} className="p-3">
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={p.trialMatches[id].status} />
-                    <span className="text-xs text-surface-400">{p.trialMatches[id].score}%</span>
-                  </div>
-                </td>
-              ))}
+              {trialIds.map((id) => {
+                const td = p.trialMatches[id];
+                if (!td) return <td key={id} className="p-3"><span className="text-xs text-surface-400">—</span></td>;
+                return (
+                  <td key={id} className="p-3">
+                    <div className="flex items-center gap-2">
+                      <StatusBadge status={td.status} />
+                      <span className="text-xs text-surface-400">{td.score}%</span>
+                    </div>
+                  </td>
+                );
+              })}
               <td className="p-3">
                 <span className="text-xs font-bold" style={{ color: allTrials[p.bestMatch.trialId]?.color }}>
                   {allTrials[p.bestMatch.trialId]?.shortName}
@@ -455,28 +407,22 @@ function CompareTable({ patients, onSelect }: {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
 export default function TrialMatcherPage() {
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
 
-  // Whitelist check state
   const [accessChecking, setAccessChecking] = useState(false);
-  const [accessUser, setAccessUser] = useState<TrialMatcherUser | null>(null);
+  const [accessUser, setAccessUser]         = useState<TrialMatcherUser | null>(null);
 
-  // Patient data state — fetched from API, falls back to static dataset
-  const [patients, setPatients]           = useState<TrialMatcherPatient[]>(STATIC_PATIENTS);
-  const [dataSource, setDataSource]       = useState<'static' | 'fhir' | 'loading'>('static');
-  const [dataError, setDataError]         = useState<string | null>(null);
-  const [allTrials, setAllTrials]         = useState<typeof TRIALS>(TRIALS);
+  const [patients, setPatients]   = useState<TrialMatcherPatient[]>(STATIC_PATIENTS);
+  const [dataSource, setDataSource] = useState<'static' | 'fhir' | 'loading'>('static');
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [allTrials, setAllTrials] = useState<AllTrials>(TRIALS as AllTrials);
 
-  // Notification state
-  const [notifCount, setNotifCount]       = useState(0);
-  const [notifOpen, setNotifOpen]         = useState(false);
+  const [notifCount, setNotifCount]     = useState(0);
+  const [notifOpen, setNotifOpen]       = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
 
-  // Dashboard state
   const [activeTrial, setActiveTrial]     = useState('NCT06983743');
   const [selectedPt, setSelectedPt]       = useState<TrialMatcherPatient | null>(null);
   const [detailTrialId, setDetailTrialId] = useState('NCT06983743');
@@ -485,34 +431,16 @@ export default function TrialMatcherPage() {
   const [search, setSearch]               = useState('');
   const [viewMode, setViewMode]           = useState<'list' | 'compare'>('list');
 
-  // ── Auth gate ──────────────────────────────────────────────────────────────
-
   useEffect(() => {
-    // Still loading Firebase auth — wait
     if (authLoading) return;
-
-    // Not logged in → send to login with return URL
-    if (!user) {
-      router.replace('/login?next=/trial-matcher');
-      return;
-    }
-
-    // Logged in — check whitelist
+    if (!user) { router.replace('/login?next=/trial-matcher'); return; }
     const email = user.email;
-    if (!email) {
-      router.replace('/trial-matcher/access-denied');
-      return;
-    }
-
+    if (!email) { router.replace('/trial-matcher/access-denied'); return; }
     setAccessChecking(true);
     checkTrialMatcherAccess(email).then((result) => {
       setAccessChecking(false);
       if (result.granted) {
-        // Sponsors go to their own portal
-        if (result.user.role === 'sponsor') {
-          router.replace('/trial-matcher/sponsor');
-          return;
-        }
+        if (result.user.role === 'sponsor') { router.replace('/trial-matcher/sponsor'); return; }
         setAccessUser(result.user);
       } else {
         router.replace('/trial-matcher/access-denied');
@@ -520,7 +448,6 @@ export default function TrialMatcherPage() {
     });
   }, [user, authLoading, router]);
 
-  // ── Fetch live patient data from API (Synthea FHIR or future Firestore)
   const fetchPatients = useCallback(async () => {
     setDataSource('loading');
     setDataError(null);
@@ -531,14 +458,10 @@ export default function TrialMatcherPage() {
       if (data.patients && data.patients.length > 0) {
         setPatients(data.patients);
         setDataSource('fhir');
-        // Always rebuild allTrials from scratch so additions/deletions take effect
-        const merged = { ...TRIALS };
-        (data.firestoreTrials || []).forEach((t: any) => {
-          merged[t.nctId] = t;
-        });
+        const merged: AllTrials = { ...(TRIALS as AllTrials) };
+        (data.firestoreTrials || []).forEach((t: any) => { merged[t.nctId] = t; });
         setAllTrials(merged);
       } else {
-        // API returned empty — stay on static data
         setPatients(STATIC_PATIENTS);
         setDataSource('static');
         if (data.message) setDataError(data.message);
@@ -550,57 +473,41 @@ export default function TrialMatcherPage() {
     }
   }, []);
 
-  // Fetch once access is confirmed
-  useEffect(() => {
-    if (accessUser) fetchPatients();
-  }, [accessUser, fetchPatients]);
+  useEffect(() => { if (accessUser) fetchPatients(); }, [accessUser, fetchPatients]);
 
-  // Re-fetch when user switches back to this tab (e.g. after activating a trial in admin)
   useEffect(() => {
     function handleVisibility() {
-      if (document.visibilityState === 'visible' && accessUser) {
-        fetchPatients();
-      }
+      if (document.visibilityState === 'visible' && accessUser) fetchPatients();
     }
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [accessUser, fetchPatients]);
 
-  // ── Fetch notifications ────────────────────────────────────────────────────
   const fetchNotifications = useCallback(async () => {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) return;
       const token = await currentUser.getIdToken(true);
-      const res = await fetch('/api/trial-matcher/rescreen', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch('/api/trial-matcher/rescreen', { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return;
       const data = await res.json();
       const unread = (data.notifications || []).filter((n: any) => !n.read);
       setNotifications(data.notifications || []);
       setNotifCount(unread.length);
-    } catch (err) {
-      console.warn('[Notifications] fetch failed:', err);
-    }
+    } catch (err) { console.warn('[Notifications] fetch failed:', err); }
   }, []);
 
-  // Fetch notifications once access is confirmed
-  useEffect(() => {
-    if (accessUser) fetchNotifications();
-  }, [accessUser, fetchNotifications]);
-
-  // ── Derived data ───────────────────────────────────────────────────────────
+  useEffect(() => { if (accessUser) fetchNotifications(); }, [accessUser, fetchNotifications]);
 
   const cancerTypes = useMemo(() => [...new Set(patients.map((p) => p.cancerType))].sort(), [patients]);
 
   const trialStats = useMemo(() =>
     Object.fromEntries(
       Object.keys(allTrials).map((id) => [id, {
-        eligible: patients.filter((p) => p.trialMatches[id].status === 'LIKELY_ELIGIBLE').length,
-        review:   patients.filter((p) => p.trialMatches[id].status === 'REVIEW_REQUIRED').length,
+        eligible: patients.filter((p) => p.trialMatches[id]?.status === 'LIKELY_ELIGIBLE').length,
+        review:   patients.filter((p) => p.trialMatches[id]?.status === 'REVIEW_REQUIRED').length,
       }])
-    ), [patients]);
+    ), [patients, allTrials]);
 
   const activeStats = trialStats[activeTrial] || { eligible: 0, review: 0 };
 
@@ -620,32 +527,20 @@ export default function TrialMatcherPage() {
     }), [patients, activeTrial, statusFilter, cancerFilter, search]);
 
   function handleTrialSwitch(id: string) {
-    setActiveTrial(id);
-    setDetailTrialId(id);
-    setSelectedPt(null);
-    setStatusFilter('LIKELY_ELIGIBLE');
+    setActiveTrial(id); setDetailTrialId(id); setSelectedPt(null); setStatusFilter('LIKELY_ELIGIBLE');
   }
 
   function handlePatientSelect(p: TrialMatcherPatient) {
-    setSelectedPt(p);
-    setDetailTrialId(activeTrial);
-    setViewMode('list');
+    setSelectedPt(p); setDetailTrialId(activeTrial); setViewMode('list');
   }
 
-  // ── Render guards ──────────────────────────────────────────────────────────
-
-  if (authLoading || accessChecking || !accessUser) {
-    return <AuthLoadingScreen />;
-  }
-
-  // ── Dashboard ──────────────────────────────────────────────────────────────
+  if (authLoading || accessChecking || !accessUser) return <AuthLoadingScreen />;
 
   const userRole = accessUser.role;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-
       <main className="flex-1 flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
 
         {/* Page header */}
@@ -653,48 +548,32 @@ export default function TrialMatcherPage() {
           <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h1 className="font-display text-xl font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
-                <FlaskConical className="w-5 h-5 text-primary-600" />
-                Trial Matcher
+                <FlaskConical className="w-5 h-5 text-primary-600" /> Trial Matcher
               </h1>
               <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                 EMR-driven · {dataSource === 'loading' ? 'Loading patients…' : `${patients.length} patients`} · {dataSource === 'fhir' ? 'Synthea FHIR R4' : 'Synthetic POC data'}
               </p>
             </div>
-
             <div className="flex items-center gap-3">
-              {/* Role indicator */}
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-xs font-semibold text-surface-600 dark:text-surface-300">
-                {userRole === 'crc'
-                  ? <><ClipboardList className="w-3.5 h-3.5" /> CRC</>
-                  : userRole === 'admin'
-                  ? <><ShieldCheck className="w-3.5 h-3.5 text-purple-500" /> Admin</>
-                  : <><Stethoscope className="w-3.5 h-3.5" /> Physician</>
-                }
+                {userRole === 'crc' ? <><ClipboardList className="w-3.5 h-3.5" /> CRC</>
+                  : userRole === 'admin' ? <><ShieldCheck className="w-3.5 h-3.5 text-purple-500" /> Admin</>
+                  : <><Stethoscope className="w-3.5 h-3.5" /> Physician</>}
               </div>
-
-              {/* Admin link */}
               {userRole === 'admin' && (
                 <Link href="/trial-matcher/admin"
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 hover:bg-purple-100 transition-colors">
                   <ShieldCheck className="w-3.5 h-3.5" /> Manage users
                 </Link>
               )}
-
-              {/* PDF export */}
               <button
                 onClick={() => generateTrialReport(allTrials[activeTrial], patients)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
-                title="Export trial prescreen report as PDF"
-              >
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors">
                 <Download className="w-3.5 h-3.5" /> Export PDF
               </button>
-
-              {/* Notification bell */}
               <div className="relative">
-                <button
-                  onClick={() => setNotifOpen(v => !v)}
-                  className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
-                >
+                <button onClick={() => setNotifOpen(v => !v)}
+                  className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors">
                   <Bell className="w-4 h-4" />
                   {notifCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
@@ -702,7 +581,6 @@ export default function TrialMatcherPage() {
                     </span>
                   )}
                 </button>
-                {/* Notification dropdown */}
                 {notifOpen && (
                   <div className="absolute right-0 top-10 w-80 bg-white dark:bg-surface-900 rounded-xl shadow-xl border border-surface-200 dark:border-surface-700 z-50 overflow-hidden">
                     <div className="px-4 py-3 border-b border-surface-100 dark:border-surface-800 flex items-center justify-between">
@@ -710,36 +588,28 @@ export default function TrialMatcherPage() {
                       <button onClick={() => setNotifOpen(false)} className="text-surface-400 hover:text-surface-600 text-xs">✕</button>
                     </div>
                     <div className="max-h-72 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-sm text-surface-400">No alerts yet</div>
-                      ) : (
-                        notifications.slice(0, 15).map((n: any) => (
+                      {notifications.length === 0
+                        ? <div className="px-4 py-8 text-center text-sm text-surface-400">No alerts yet</div>
+                        : notifications.slice(0, 15).map((n: any) => (
                           <div key={n.id} className={`px-4 py-3 border-b border-surface-50 dark:border-surface-800 ${!n.read ? 'bg-emerald-50 dark:bg-emerald-900/10' : ''}`}>
-                            <p className="text-xs font-semibold text-surface-900 dark:text-surface-100">
-                              {n.patientId} → {n.trialName}
-                            </p>
+                            <p className="text-xs font-semibold text-surface-900 dark:text-surface-100">{n.patientId} → {n.trialName}</p>
                             <p className="text-xs text-surface-500 mt-0.5">
                               <span className="line-through text-surface-400">{n.previousStatus?.replace(/_/g,' ')}</span>
-                              {' → '}
-                              <span className="text-emerald-600 font-semibold">{n.newStatus?.replace(/_/g,' ')}</span>
+                              {' → '}<span className="text-emerald-600 font-semibold">{n.newStatus?.replace(/_/g,' ')}</span>
                               {' · '}{n.newScore}%
                             </p>
                             <p className="text-[10px] text-surface-400 mt-0.5">{n.cancerType} · {n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ''}</p>
                           </div>
                         ))
-                      )}
+                      }
                     </div>
-                    <div className="px-4 py-2.5 border-t border-surface-100 dark:border-surface-800 flex items-center justify-between">
+                    <div className="px-4 py-2.5 border-t border-surface-100 dark:border-surface-800">
                       <button
                         onClick={async () => {
                           try {
                             const currentUser = auth.currentUser;
-                            if (!currentUser) {
-                              console.error('[Rescreen] No current user');
-                              return;
-                            }
+                            if (!currentUser) return;
                             const token = await currentUser.getIdToken(true);
-                            console.log('[Rescreen] Triggering with token:', token.slice(0, 20) + '...');
                             const res = await fetch('/api/trial-matcher/rescreen', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -749,31 +619,19 @@ export default function TrialMatcherPage() {
                             console.log('[Rescreen] Response:', data);
                             fetchNotifications();
                             setNotifOpen(false);
-                          } catch (err) {
-                            console.error('[Rescreen] Error:', err);
-                          }
+                          } catch (err) { console.error('[Rescreen] Error:', err); }
                         }}
-                        className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold"
-                      >
+                        className="text-xs text-primary-600 dark:text-primary-400 hover:underline font-semibold">
                         ↻ Run re-screening now
                       </button>
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* User email */}
-              <span className="text-xs text-surface-400 hidden sm:block">
-                {accessUser.name ?? accessUser.email}
-              </span>
-
-              {/* Sign out */}
-              <button
-                onClick={() => { signOut(); router.push('/'); }}
-                className="flex items-center gap-1.5 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Sign out
+              <span className="text-xs text-surface-400 hidden sm:block">{accessUser.name ?? accessUser.email}</span>
+              <button onClick={() => { signOut(); router.push('/'); }}
+                className="flex items-center gap-1.5 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors">
+                <LogOut className="w-3.5 h-3.5" /> Sign out
               </button>
             </div>
           </div>
@@ -781,55 +639,44 @@ export default function TrialMatcherPage() {
 
         {/* App body */}
         <div className="flex flex-1 overflow-hidden max-w-screen-2xl mx-auto w-full">
-
-          {/* Sidebar */}
           <aside className="w-56 flex-shrink-0 bg-white dark:bg-surface-900 border-r border-surface-200 dark:border-surface-700 flex flex-col">
             <div className="p-3 border-b border-surface-100 dark:border-surface-800">
               <p className="text-[9px] font-bold text-surface-400 uppercase tracking-wider mb-2">Active Trials</p>
               <div className="space-y-1">
                 {Object.values(allTrials).map((t) => (
-                  <TrialSidebarBtn
-                    key={t.nctId} trial={t} active={activeTrial === t.nctId}
+                  <TrialSidebarBtn key={t.nctId} trial={t} active={activeTrial === t.nctId}
                     eligibleCount={trialStats[t.nctId]?.eligible ?? 0}
                     reviewCount={trialStats[t.nctId]?.review ?? 0}
-                    onClick={() => handleTrialSwitch(t.nctId)}
-                  />
+                    onClick={() => handleTrialSwitch(t.nctId)} />
                 ))}
               </div>
             </div>
             <div className="p-3 mt-auto border-t border-surface-100 dark:border-surface-800">
               <p className="text-[9px] font-bold text-surface-400 uppercase tracking-wider mb-1">Data source</p>
               <p className="text-[10px] text-surface-500 dark:text-surface-400 leading-relaxed">
-                {dataSource === 'fhir' ? (
-                  <><span className="text-emerald-600 font-semibold">● Synthea FHIR R4</span><br />{patients.length} patients loaded</>
-                ) : dataSource === 'loading' ? (
-                  <><span className="text-amber-600 font-semibold">● Loading…</span></>
-                ) : (
-                  <><span className="text-surface-400 font-semibold">● POC synthetic data</span><br />{patients.length} patients</>
-                )}
+                {dataSource === 'fhir'
+                  ? <><span className="text-emerald-600 font-semibold">● Synthea FHIR R4</span><br />{patients.length} patients loaded</>
+                  : dataSource === 'loading'
+                  ? <><span className="text-amber-600 font-semibold">● Loading…</span></>
+                  : <><span className="text-surface-400 font-semibold">● POC synthetic data</span><br />{patients.length} patients</>
+                }
                 {dataError && <span className="text-amber-500 block mt-1">{dataError}</span>}
               </p>
-              <button
-                onClick={fetchPatients}
-                disabled={dataSource === 'loading'}
-                className="mt-2 text-[10px] text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-40"
-              >
+              <button onClick={fetchPatients} disabled={dataSource === 'loading'}
+                className="mt-2 text-[10px] text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-40">
                 {dataSource === 'loading' ? 'Loading…' : '↻ Refresh data'}
               </button>
             </div>
           </aside>
 
-          {/* Main content */}
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-
-            {/* Trial info bar */}
             <div className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-5 py-2.5 flex items-center gap-3 flex-wrap flex-shrink-0">
               {(() => {
                 const t = allTrials[activeTrial];
+                if (!t) return null;
                 return (
                   <>
-                    <span className="text-sm font-bold px-3 py-1 rounded-full"
-                      style={{ background: t.colorLight, color: t.color }}>{t.name}</span>
+                    <span className="text-sm font-bold px-3 py-1 rounded-full" style={{ background: t.colorLight, color: t.color }}>{t.name}</span>
                     <span className="text-xs px-2.5 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 font-medium">{t.phase}</span>
                     <span className="text-xs text-surface-500 dark:text-surface-400">{t.indication}</span>
                     <span className="ml-auto text-xs text-surface-400">{t.sponsor}</span>
@@ -839,13 +686,12 @@ export default function TrialMatcherPage() {
               })()}
             </div>
 
-            {/* Metrics */}
             <div className="grid grid-cols-4 gap-3 px-5 py-3 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 flex-shrink-0">
               {[
-                { label: 'Screened',        value: '1,000',                                         color: 'text-surface-900 dark:text-surface-100', sub: 'total patients' },
-                { label: 'Likely eligible', value: activeStats.eligible,                             color: 'text-emerald-700 dark:text-emerald-400',  sub: 'ready for contact' },
-                { label: 'Review required', value: activeStats.review,                               color: 'text-amber-700 dark:text-amber-400',      sub: 'data gaps present' },
-                { label: 'Auto-excluded',   value: 1000 - activeStats.eligible - activeStats.review, color: 'text-red-700 dark:text-red-400',          sub: 'no criteria match' },
+                { label: 'Screened',        value: patients.length.toLocaleString(),                    color: 'text-surface-900 dark:text-surface-100', sub: 'total patients' },
+                { label: 'Likely eligible', value: activeStats.eligible,                                 color: 'text-emerald-700 dark:text-emerald-400',  sub: 'ready for contact' },
+                { label: 'Review required', value: activeStats.review,                                   color: 'text-amber-700 dark:text-amber-400',      sub: 'data gaps present' },
+                { label: 'Auto-excluded',   value: patients.length - activeStats.eligible - activeStats.review, color: 'text-red-700 dark:text-red-400', sub: 'no criteria match' },
               ].map((m) => (
                 <div key={m.label} className="bg-surface-50 dark:bg-surface-800/60 rounded-xl p-3">
                   <p className="text-[10px] font-bold text-surface-400 uppercase tracking-wider mb-1">{m.label}</p>
@@ -855,30 +701,21 @@ export default function TrialMatcherPage() {
               ))}
             </div>
 
-            {/* Controls */}
             <div className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 flex-wrap flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-surface-400" />
-                <input
-                  className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none focus:border-primary-400 w-40"
-                  placeholder="Search patient ID…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+                <input className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none focus:border-primary-400 w-40"
+                  placeholder="Search patient ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
-              <select
-                className="text-xs px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none cursor-pointer"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as MatchStatus | 'all')}>
+              <select className="text-xs px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none cursor-pointer"
+                value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as MatchStatus | 'all')}>
                 <option value="all">All statuses</option>
                 <option value="LIKELY_ELIGIBLE">Likely eligible</option>
                 <option value="REVIEW_REQUIRED">Review required</option>
                 <option value="EXCLUDED">Excluded</option>
               </select>
-              <select
-                className="text-xs px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none cursor-pointer"
-                value={cancerFilter}
-                onChange={(e) => setCancerFilter(e.target.value)}>
+              <select className="text-xs px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none cursor-pointer"
+                value={cancerFilter} onChange={(e) => setCancerFilter(e.target.value)}>
                 <option value="all">All cancers</option>
                 {cancerTypes.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -895,32 +732,32 @@ export default function TrialMatcherPage() {
               </div>
             </div>
 
-            {/* Body */}
             <div className="flex flex-1 overflow-hidden min-h-0">
               {viewMode === 'compare' ? (
-                <CompareTable patients={filtered} onSelect={handlePatientSelect} />
+                <CompareTable patients={filtered} onSelect={handlePatientSelect} allTrials={allTrials} />
               ) : (
                 <>
                   <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900">
-                    {filtered.length === 0 ? (
-                      <div className="text-center py-16 text-surface-400">
-                        <Users className="w-8 h-8 mx-auto mb-3 opacity-30" />
-                        <p className="text-sm">No patients match filters</p>
-                      </div>
-                    ) : (
-                      <AnimatePresence initial={false}>
-                        {filtered.map((p) => (
-                          <PatientRow key={p.patientId} patient={p} activeTrial={activeTrial}
-                            selected={selectedPt?.patientId === p.patientId}
-                            onClick={() => { setSelectedPt(p); setDetailTrialId(activeTrial); }}
-                          />
-                        ))}
-                      </AnimatePresence>
-                    )}
+                    {filtered.length === 0
+                      ? <div className="text-center py-16 text-surface-400"><Users className="w-8 h-8 mx-auto mb-3 opacity-30" /><p className="text-sm">No patients match filters</p></div>
+                      : <AnimatePresence initial={false}>
+                          {filtered.map((p) => (
+                            <PatientRow key={p.patientId} patient={p} activeTrial={activeTrial}
+                              selected={selectedPt?.patientId === p.patientId}
+                              onClick={() => { setSelectedPt(p); setDetailTrialId(activeTrial); }} />
+                          ))}
+                        </AnimatePresence>
+                    }
                   </div>
                   <div className="flex-1 overflow-y-auto bg-surface-50 dark:bg-surface-900 min-w-0">
-                    <DetailPanel patient={selectedPt} detailTrialId={detailTrialId}
-                      onTrialSelect={setDetailTrialId} viewMode={userRole} />
+                    <DetailPanel
+                      patient={selectedPt}
+                      detailTrialId={detailTrialId}
+                      onTrialSelect={setDetailTrialId}
+                      viewMode={userRole}
+                      allTrials={allTrials}
+                      onPatientReport={(p) => generatePatientReport(p, allTrials)}
+                    />
                   </div>
                 </>
               )}
