@@ -35,7 +35,7 @@ async function getActiveFirestoreTrials(): Promise<Array<{ nctId: string; matchi
       .get();
     return snap.docs
       .map(d => ({ nctId: d.id, ...d.data() } as any))
-      .filter((t: any) => Array.isArray(t.matchingRules) ? t.matchingRules.length > 0 : true);
+      ;
   } catch (err) {
     console.error('[patients] Firestore trials fetch error:', err);
     return [];
