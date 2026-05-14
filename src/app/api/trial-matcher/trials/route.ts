@@ -33,6 +33,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
+import { Timestamp } from 'firebase-admin/firestore';
 
 
 async function verifyAdmin(req: NextRequest): Promise<string | null> {
