@@ -542,11 +542,11 @@ export default function TrialMatcherPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+      <main className="flex-1 flex flex-col" style={{ minHeight: 'calc(100vh - 64px)' }}>
 
         {/* Page header */}
-        <div className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-6 py-3.5 flex-shrink-0">
-          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4 flex-wrap">
+        <div className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-3 md:px-6 py-2.5 md:py-3.5 flex-shrink-0">
+          <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-2 flex-wrap">
             <div>
               <h1 className="font-display text-xl font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
                 <FlaskConical className="w-5 h-5 text-primary-600" /> Trial Matcher
@@ -633,15 +633,15 @@ export default function TrialMatcherPage() {
               <span className="text-xs text-surface-400 hidden sm:block">{accessUser.name ?? accessUser.email}</span>
               <button onClick={() => { signOut(); router.push('/'); }}
                 className="flex items-center gap-1.5 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors">
-                <LogOut className="w-3.5 h-3.5" /> Sign out
+                <LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Sign out</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* App body */}
-        <div className="flex flex-1 overflow-hidden max-w-screen-2xl mx-auto w-full">
-          <aside className="w-56 flex-shrink-0 bg-white dark:bg-surface-900 border-r border-surface-200 dark:border-surface-700 flex flex-col">
+        <div className="flex flex-1 overflow-hidden md:overflow-hidden max-w-screen-2xl mx-auto w-full relative">
+          <aside className={`flex-shrink-0 bg-white dark:bg-surface-900 border-r border-surface-200 dark:border-surface-700 flex flex-col w-full md:w-56 ${mobilePanel === 'trials' ? 'flex' : 'hidden'} md:flex`}>
             <div className="p-3 border-b border-surface-100 dark:border-surface-800">
               <p className="text-[9px] font-bold text-surface-400 uppercase tracking-wider mb-2">Active Trials</p>
               <div className="space-y-1">
@@ -649,7 +649,7 @@ export default function TrialMatcherPage() {
                   <TrialSidebarBtn key={t.nctId} trial={t} active={activeTrial === t.nctId}
                     eligibleCount={trialStats[t.nctId]?.eligible ?? 0}
                     reviewCount={trialStats[t.nctId]?.review ?? 0}
-                    onClick={() => handleTrialSwitch(t.nctId)} />
+                    onClick={() => { handleTrialSwitch(t.nctId); if (window.innerWidth < 768) setMobilePanel('patients'); }} />
                 ))}
               </div>
             </div>
@@ -671,7 +671,7 @@ export default function TrialMatcherPage() {
             </div>
           </aside>
 
-          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <div className={`flex-1 flex-col overflow-hidden min-w-0 ${mobilePanel !== 'trials' ? 'flex' : 'hidden'} md:flex`}>
             <div className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-5 py-2.5 flex items-center gap-3 flex-wrap flex-shrink-0">
               {(() => {
                 const t = allTrials[activeTrial];
@@ -688,7 +688,7 @@ export default function TrialMatcherPage() {
               })()}
             </div>
 
-            <div className="grid grid-cols-4 gap-3 px-5 py-3 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 flex-shrink-0">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 px-3 md:px-5 py-2.5 md:py-3 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 flex-shrink-0">
               {[
                 { label: 'Screened',        value: patients.length.toLocaleString(),                    color: 'text-surface-900 dark:text-surface-100', sub: 'total patients' },
                 { label: 'Likely eligible', value: activeStats.eligible,                                 color: 'text-emerald-700 dark:text-emerald-400',  sub: 'ready for contact' },
@@ -703,11 +703,11 @@ export default function TrialMatcherPage() {
               ))}
             </div>
 
-            <div className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 flex-wrap flex-shrink-0">
+            <div className="flex items-center gap-2 px-3 md:px-5 py-2 bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 flex-wrap flex-shrink-0">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-surface-400" />
                 <input className="pl-8 pr-3 py-1.5 text-xs rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none focus:border-primary-400 w-40"
-                  placeholder="Search patient ID…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} style={{width: "8rem"}} />
               </div>
               <select className="text-xs px-2.5 py-1.5 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none cursor-pointer"
                 value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as MatchStatus | 'all')}>
@@ -739,19 +739,19 @@ export default function TrialMatcherPage() {
                 <CompareTable patients={filtered} onSelect={handlePatientSelect} allTrials={allTrials} />
               ) : (
                 <>
-                  <div className="w-80 flex-shrink-0 overflow-y-auto border-r border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900">
+                  <div className={`flex-shrink-0 overflow-y-auto border-r border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 w-full md:w-80 ${mobilePanel === 'patients' ? 'block' : 'hidden'} md:block`}>
                     {filtered.length === 0
                       ? <div className="text-center py-16 text-surface-400"><Users className="w-8 h-8 mx-auto mb-3 opacity-30" /><p className="text-sm">No patients match filters</p></div>
                       : <AnimatePresence initial={false}>
                           {filtered.map((p) => (
                             <PatientRow key={p.patientId} patient={p} activeTrial={activeTrial}
                               selected={selectedPt?.patientId === p.patientId}
-                              onClick={() => { setSelectedPt(p); setDetailTrialId(activeTrial); }} />
+                              onClick={() => { setSelectedPt(p); setDetailTrialId(activeTrial); if (window.innerWidth < 768) setMobilePanel('detail'); }} />
                           ))}
                         </AnimatePresence>
                     }
                   </div>
-                  <div className="flex-1 overflow-y-auto bg-surface-50 dark:bg-surface-900 min-w-0">
+                  <div className={`overflow-y-auto bg-surface-50 dark:bg-surface-900 min-w-0 flex-1 ${mobilePanel === 'detail' ? 'block' : 'hidden'} md:block`}>
                     <DetailPanel
                       patient={selectedPt}
                       detailTrialId={detailTrialId}
@@ -766,6 +766,30 @@ export default function TrialMatcherPage() {
             </div>
           </div>
         </div>
+
+        {/* Mobile bottom navigation */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-surface-900 border-t border-surface-200 dark:border-surface-700 flex md:hidden z-40">
+          <button
+            onClick={() => setMobilePanel('trials')}
+            className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] font-semibold transition-colors ${mobilePanel === 'trials' ? 'text-primary-600' : 'text-surface-400'}`}>
+            <FlaskConical className="w-5 h-5" />
+            Trials
+          </button>
+          <button
+            onClick={() => setMobilePanel('patients')}
+            className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] font-semibold transition-colors ${mobilePanel === 'patients' ? 'text-primary-600' : 'text-surface-400'}`}>
+            <Users className="w-5 h-5" />
+            Patients
+          </button>
+          <button
+            onClick={() => setMobilePanel('detail')}
+            className={`flex-1 flex flex-col items-center py-2.5 gap-0.5 text-[10px] font-semibold transition-colors ${mobilePanel === 'detail' ? 'text-primary-600' : 'text-surface-400'}`}>
+            <ClipboardList className="w-5 h-5" />
+            Detail
+          </button>
+        </div>
+        {/* Mobile bottom nav spacer */}
+        <div className="h-16 md:hidden flex-shrink-0" />
       </main>
     </div>
   );
