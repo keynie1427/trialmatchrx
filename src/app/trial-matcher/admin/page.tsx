@@ -310,12 +310,26 @@ export default function TrialMatcherAdminPage() {
   // ── Get Firebase ID token for API calls ───────────────────────────────────
 
   async function getToken(): Promise<string> {
+    // Wait up to 5s for Firebase to restore the auth session
     return new Promise((resolve, reject) => {
+      let settled = false;
       const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
-        unsubscribe();
-        if (!firebaseUser) { reject(new Error('Not authenticated')); return; }
-        firebaseUser.getIdToken(true).then(resolve).catch(reject);
+        if (settled) return;
+        if (firebaseUser) {
+          settled = true;
+          unsubscribe();
+          firebaseUser.getIdToken(true).then(resolve).catch(reject);
+        }
+        // If null, keep waiting — Firebase may still be restoring the session
       });
+      // Timeout after 5 seconds
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          unsubscribe();
+          reject(new Error('Auth timeout'));
+        }
+      }, 5000);
     });
   }
 
