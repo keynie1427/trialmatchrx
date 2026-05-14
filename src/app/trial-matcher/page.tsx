@@ -422,6 +422,7 @@ export default function TrialMatcherPage() {
 
   const [notifCount, setNotifCount]     = useState(0);
   const [notifOpen, setNotifOpen]       = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'trials' | 'patients' | 'detail'>('trials');
   const [notifications, setNotifications] = useState<any[]>([]);
 
   const [activeTrial, setActiveTrial]     = useState('NCT06983743');
