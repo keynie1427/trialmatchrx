@@ -7,6 +7,10 @@
     {
       "path": "/api/trial-matcher/rescreen",
       "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/trial-matcher/trials/discover",
+      "schedule": "0 6 * * *"
     }
   ]
 }
