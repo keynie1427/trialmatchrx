@@ -36,6 +36,7 @@ import {
 import Link from 'next/link';
 import Header from '@/components/Header';
 import { useAuth } from '@/hooks/useAuth';
+import { auth } from '@/lib/firebase';
 import { checkTrialMatcherAccess, type TrialMatcherRole, type TrialMatcherUser } from '@/lib/trialMatcherAuth';
 import { generateTrialReport, generatePatientReport } from '@/lib/trialMatcherPdf';
 import {
