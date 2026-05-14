@@ -14,9 +14,7 @@
 //   { "path": "/api/trial-matcher/trials/discover", "schedule": "0 6 * * *" }
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
 
 
 

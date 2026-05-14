@@ -4,9 +4,7 @@
 // DELETE /api/trial-matcher/trials/[nctId] → remove trial from matcher
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
 
 
 

@@ -32,12 +32,7 @@
 // }
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
-
-// ─── Firebase Admin ───────────────────────────────────────────────────────────
-
+import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
 
 
 async function verifyAdmin(req: NextRequest): Promise<string | null> {

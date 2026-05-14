@@ -17,9 +17,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminApp, getAdminDb, getAdminAuth, verifyAdminRole } from '@/lib/firebaseAdmin';
 import * as XLSX from 'xlsx';
 
-// ─── Firebase Admin ───────────────────────────────────────────────────────────
-
-
 
 async function verifyAccess(req: NextRequest): Promise<boolean> {
   const authHeader = req.headers.get('authorization') || '';

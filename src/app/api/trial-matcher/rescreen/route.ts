@@ -21,11 +21,7 @@
 //   (runs every Monday at 8am UTC)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
-
-// ─── Firebase Admin ───────────────────────────────────────────────────────────
-
+import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
