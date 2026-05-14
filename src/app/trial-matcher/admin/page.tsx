@@ -19,7 +19,9 @@ import {
   Pencil,
   Trash2,
   CheckCircle2,
+  CheckCircle2 as CheckCircle,
   XCircle,
+  AlertTriangle,
   Loader2,
   ShieldCheck,
   FlaskConical,
@@ -27,17 +29,10 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
-  CheckCircle2 as CheckCircle,
-  XCircle,
-  AlertTriangle,
-  ChevronDown,
-  ChevronRight,
-  FlaskConical,
   ArrowLeft,
   Search,
   ToggleLeft,
   ToggleRight,
-  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/components/Header';
