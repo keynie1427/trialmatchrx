@@ -310,9 +310,13 @@ export default function TrialMatcherAdminPage() {
   // ── Get Firebase ID token for API calls ───────────────────────────────────
 
   async function getToken(): Promise<string> {
-    const currentUser = auth.currentUser;
-    if (!currentUser) throw new Error('Not authenticated');
-    return currentUser.getIdToken();
+    return new Promise((resolve, reject) => {
+      const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+        unsubscribe();
+        if (!firebaseUser) { reject(new Error('Not authenticated')); return; }
+        firebaseUser.getIdToken(true).then(resolve).catch(reject);
+      });
+    });
   }
 
   function showToast(msg: string, type: 'success' | 'error' = 'success') {
