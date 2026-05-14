@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { auth } from '@/lib/firebase';
 import { checkTrialMatcherAccess, type TrialMatcherRole, type TrialMatcherUser } from '@/lib/trialMatcherAuth';
 import { generateTrialReport, generatePatientReport } from '@/lib/trialMatcherPdf';
+import IRBLogExport from '@/components/IRBLogExport';
 import {
   PATIENTS as STATIC_PATIENTS, TRIALS, STATUS_CONFIG,
   type TrialMatcherPatient, type MatchStatus, type TrialDefinition,
@@ -566,11 +567,12 @@ export default function TrialMatcherPage() {
                   <ShieldCheck className="w-3.5 h-3.5" /> Manage users
                 </Link>
               )}
-              <button
-                onClick={() => generateTrialReport(allTrials[activeTrial], patients)}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors">
-                <Download className="w-3.5 h-3.5" /> Export PDF
-              </button>
+              <IRBLogExport
+                trial={allTrials[activeTrial]}
+                trials={allTrials}
+                patients={patients}
+                selectedPatient={selectedPt}
+              />
               <div className="relative">
                 <button onClick={() => setNotifOpen(v => !v)}
                   className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-500 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors">
