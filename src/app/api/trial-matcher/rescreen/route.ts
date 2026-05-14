@@ -26,16 +26,7 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 // ─── Firebase Admin ───────────────────────────────────────────────────────────
 
-function getAdminApp(): App {
-  if (getApps().length > 0) return getApps()[0];
-  return initializeApp({
-    credential: cert({
-      projectId:   process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey:  process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,8 +150,8 @@ export async function POST(req: NextRequest) {
       const app = getAdminApp();
       const { getAuth } = await import('firebase-admin/auth');
       const token = authHeader.replace('Bearer ', '');
-      const decoded = await getAuth(app).verifyIdToken(token);
-      const db = getFirestore(app);
+      const decoded = await getAdminAuth().verifyIdToken(token);
+      const db = getAdminDb();
       const doc = await db.collection('trial_matcher_users').doc(decoded.email!).get();
       if (!doc.exists || doc.data()?.role !== 'admin') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -175,7 +166,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminDb();
 
     // 1. Fetch current patient eligibility from FHIR pipeline
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mytrialmatchrx.com';
@@ -332,8 +323,8 @@ export async function GET(req: NextRequest) {
     const app = getAdminApp();
     const { getAuth } = await import('firebase-admin/auth');
     const token = authHeader.replace('Bearer ', '');
-    const decoded = await getAuth(app).verifyIdToken(token);
-    const db = getFirestore(app);
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    const db = getAdminDb();
     const doc = await db.collection('trial_matcher_users').doc(decoded.email!).get();
     if (!doc.exists || doc.data()?.active === false) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -344,7 +335,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminDb();
     const snap = await db.collection('trial_matcher_notifications')
       .orderBy('createdAt', 'desc')
       .limit(50)

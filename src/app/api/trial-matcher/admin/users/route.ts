@@ -12,16 +12,7 @@ import { getAuth } from 'firebase-admin/auth';
 
 // ─── Firebase Admin Init ──────────────────────────────────────────────────────
 
-function getAdminApp(): App {
-  if (getApps().length > 0) return getApps()[0];
-  return initializeApp({
-    credential: cert({
-      projectId:   process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey:  process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+
 
 async function verifyAdminToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -29,9 +20,9 @@ async function verifyAdminToken(req: NextRequest): Promise<string | null> {
   const token = authHeader.slice(7);
   try {
     const app = getAdminApp();
-    const decoded = await getAuth(app).verifyIdToken(token);
+    const decoded = await getAdminAuth().verifyIdToken(token);
     // Check admin role in Firestore
-    const db = getFirestore(app);
+    const db = getAdminDb();
     const doc = await db.collection('trial_matcher_users').doc(decoded.email!).get();
     if (!doc.exists || doc.data()?.role !== 'admin' || doc.data()?.active === false) return null;
     return decoded.email!;
@@ -50,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminDb();
     const snapshot = await db.collection('trial_matcher_users').orderBy('addedAt', 'desc').get();
 
     const users = snapshot.docs.map(doc => ({
@@ -95,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase();
     const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminDb();
     const docRef = db.collection('trial_matcher_users').doc(normalizedEmail);
     const existing = await docRef.get();
 

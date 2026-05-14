@@ -4,20 +4,9 @@
 // DELETE /api/trial-matcher/admin/users/[email]  → permanently delete user
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getApps, initializeApp, cert, App } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
+import { getAdminApp, getAdminDb, getAdminAuth, verifyAdminRole } from '@/lib/firebaseAdmin';
 
-function getAdminApp(): App {
-  if (getApps().length > 0) return getApps()[0];
-  return initializeApp({
-    credential: cert({
-      projectId:   process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey:  process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+
 
 async function verifyAdminToken(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
@@ -25,8 +14,8 @@ async function verifyAdminToken(req: NextRequest): Promise<string | null> {
   const token = authHeader.slice(7);
   try {
     const app = getAdminApp();
-    const decoded = await getAuth(app).verifyIdToken(token);
-    const db = getFirestore(app);
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    const db = getAdminDb();
     const doc = await db.collection('trial_matcher_users').doc(decoded.email!).get();
     if (!doc.exists || doc.data()?.role !== 'admin' || doc.data()?.active === false) return null;
     return decoded.email!;
@@ -70,7 +59,7 @@ export async function PATCH(
     if (assignedTrialId !== undefined)  updates.assignedTrialId = assignedTrialId || null;
 
     const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminDb();
     const docRef = db.collection('trial_matcher_users').doc(targetEmail);
     const existing = await docRef.get();
 
@@ -107,7 +96,7 @@ export async function DELETE(
 
   try {
     const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminDb();
     const docRef = db.collection('trial_matcher_users').doc(targetEmail);
     const existing = await docRef.get();
 

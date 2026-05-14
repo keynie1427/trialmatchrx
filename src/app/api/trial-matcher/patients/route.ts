@@ -23,35 +23,21 @@ import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import { parseFhirBundle } from '@/lib/fhirAdapter';
 import type { TrialMatcherPatient } from '@/lib/trialMatcherData';
-import { getApps, initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-
-// ─── Firebase Admin ───────────────────────────────────────────────────────────
-
-function getAdminApp() {
-  if (getApps().length > 0) return getApps()[0];
-  return initializeApp({
-    credential: cert({
-      projectId:   process.env.FIREBASE_ADMIN_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_ADMIN_CLIENT_EMAIL,
-      privateKey:  process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
-}
+import { getAdminDb } from '@/lib/firebaseAdmin';
 
 // ─── Fetch active Firestore trials ────────────────────────────────────────────
 
 async function getActiveFirestoreTrials(): Promise<Array<{ nctId: string; matchingRules: any[]; name: string; shortName: string; sponsor: string; phase: string; indication: string; drug: string; status: string; biomarker: string; color: string; colorLight: string; colorDark: string }>> {
   try {
-    const app = getAdminApp();
-    const db = getFirestore(app);
+    const db = getAdminDb();
     const snap = await db.collection('trial_matcher_trials')
       .where('trialStatus', '==', 'active')
       .get();
     return snap.docs
       .map(d => ({ nctId: d.id, ...d.data() } as any))
-      .filter(t => t.matchingRules?.length > 0);
-  } catch {
+      .filter((t: any) => t.matchingRules?.length > 0);
+  } catch (err) {
+    console.error('[patients] Firestore trials fetch error:', err);
     return [];
   }
 }
