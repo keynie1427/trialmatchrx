@@ -530,14 +530,12 @@ export default function TrialMatcherPage() {
       if (data.patients && data.patients.length > 0) {
         setPatients(data.patients);
         setDataSource('fhir');
-        // Merge Firestore trials into the trials map
-        if (data.firestoreTrials?.length > 0) {
-          const merged = { ...TRIALS };
-          data.firestoreTrials.forEach((t: any) => {
-            if (!merged[t.nctId]) merged[t.nctId] = t;
-          });
-          setAllTrials(merged);
-        }
+        // Always rebuild allTrials from scratch so additions/deletions take effect
+        const merged = { ...TRIALS };
+        (data.firestoreTrials || []).forEach((t: any) => {
+          merged[t.nctId] = t;
+        });
+        setAllTrials(merged);
       } else {
         // API returned empty — stay on static data
         setPatients(STATIC_PATIENTS);
@@ -554,6 +552,17 @@ export default function TrialMatcherPage() {
   // Fetch once access is confirmed
   useEffect(() => {
     if (accessUser) fetchPatients();
+  }, [accessUser, fetchPatients]);
+
+  // Re-fetch when user switches back to this tab (e.g. after activating a trial in admin)
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible' && accessUser) {
+        fetchPatients();
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [accessUser, fetchPatients]);
 
   // ── Fetch notifications ────────────────────────────────────────────────────
