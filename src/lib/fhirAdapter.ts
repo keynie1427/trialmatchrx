@@ -446,7 +446,7 @@ export function parseFhirBundle(
   // Run dynamic Firestore trial rules
   const dynamicMatches = Object.fromEntries(
     firestoreTrials
-      .filter(t => t.matchingRules?.length > 0)
+      .filter(t => t.matchingRules && t.matchingRules.length > 0)
       .map(t => [t.nctId, evaluateFirestoreTrial(base, t.matchingRules)])
   );
 

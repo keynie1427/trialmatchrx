@@ -25,6 +25,8 @@ import { parseFhirBundle } from '@/lib/fhirAdapter';
 import type { TrialMatcherPatient } from '@/lib/trialMatcherData';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 
+export const dynamic = 'force-dynamic';
+
 // ─── Fetch active Firestore trials ────────────────────────────────────────────
 
 async function getActiveFirestoreTrials(): Promise<Array<{ nctId: string; matchingRules: any[]; name: string; shortName: string; sponsor: string; phase: string; indication: string; drug: string; status: string; biomarker: string; color: string; colorLight: string; colorDark: string }>> {
