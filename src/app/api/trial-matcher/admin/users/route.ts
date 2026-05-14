@@ -6,11 +6,7 @@
 // Both endpoints verify the caller is an authenticated admin before proceeding.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
-
-// ─── Firebase Admin Init ──────────────────────────────────────────────────────
+import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
 
 
 
