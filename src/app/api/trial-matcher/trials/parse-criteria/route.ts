@@ -101,7 +101,11 @@ export async function POST(req: NextRequest) {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'anthropic-version': '2023-06-01',
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 3000,
@@ -130,7 +134,7 @@ export async function POST(req: NextRequest) {
   let validationError: string | null = null;
 
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mytrialmatchrx.com';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const pRes = await fetch(`${baseUrl}/api/trial-matcher/patients`);
     if (pRes.ok) {
       const { patients } = await pRes.json();

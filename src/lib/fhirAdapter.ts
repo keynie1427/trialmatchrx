@@ -325,9 +325,78 @@ const TRIAL_MATCHERS: Record<string, (p: BasePatient) => MatchResult> = {
   NCT03539536: matchProdige,
 };
 
+// ─── Dynamic trial evaluator (for Firestore trials) ───────────────────────────
+// Evaluates a patient against AI-parsed matching rules from Firestore.
+// Rules have: field, operator, value, type, required, criterion, plainEnglish
+
+function evaluateFirestoreTrial(base: BasePatient, rules: any[]): MatchResult {
+  if (!rules?.length) {
+    return { score: 0, status: 'EXCLUDED', criteria: [] };
+  }
+
+  const criteria: MatchResult['criteria'] = [];
+  let hardExclude = false;
+
+  for (const rule of rules) {
+    const field = rule.field as string;
+    const operator = rule.operator as string;
+    const expected = rule.value;
+    const required = rule.required ?? true;
+
+    // Get actual value from patient
+    const actual = field.split('.').reduce((obj: any, key) => obj?.[key], base as any);
+
+    let pass: boolean | null = null;
+
+    if (operator === 'manual') {
+      pass = null; // always manual review
+    } else if (actual === null || actual === undefined) {
+      pass = null; // data not available
+    } else {
+      switch (operator) {
+        case 'gte':          pass = Number(actual) >= Number(expected); break;
+        case 'lte':          pass = Number(actual) <= Number(expected); break;
+        case 'eq':           pass = actual === expected; break;
+        case 'not_eq':       pass = actual !== expected; break;
+        case 'includes':     pass = Array.isArray(actual) && actual.includes(expected); break;
+        case 'not_includes': pass = !Array.isArray(actual) || !actual.includes(expected); break;
+        case 'in':           pass = Array.isArray(expected) && expected.includes(actual); break;
+        default:             pass = null;
+      }
+    }
+
+    if (pass === false && required && rule.type === 'include') {
+      hardExclude = true;
+    }
+
+    criteria.push({
+      criterion: rule.criterion || field,
+      pass,
+      value: rule.plainEnglish
+        ? `${actual ?? 'N/A'}`
+        : `${field}: ${actual ?? 'N/A'}`,
+      type: rule.type === 'exclude_warn' ? 'exclude_warn' : 'include',
+    });
+  }
+
+  if (hardExclude) return { score: 0, status: 'EXCLUDED', criteria };
+
+  const includeRules = criteria.filter(c => c.type === 'include');
+  const passes = includeRules.filter(c => c.pass === true).length;
+  const score = includeRules.length > 0
+    ? Math.round((passes / includeRules.length) * 1000) / 10
+    : 0;
+
+  const status = score >= 83 ? 'LIKELY_ELIGIBLE' : score >= 50 ? 'REVIEW_REQUIRED' : 'EXCLUDED';
+  return { score, status, criteria };
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
-export function parseFhirBundle(bundle: FhirBundle): TrialMatcherPatient | null {
+export function parseFhirBundle(
+  bundle: FhirBundle,
+  firestoreTrials: Array<{ nctId: string; matchingRules: any[] }> = []
+): TrialMatcherPatient | null {
   if (bundle.resourceType !== 'Bundle' || !bundle.entry) return null;
   const resources = bundle.entry.map(e => e.resource).filter(Boolean) as FhirResource[];
   const patient = resources.find(r => r.resourceType === 'Patient') as FhirPatient | undefined;
@@ -369,9 +438,19 @@ export function parseFhirBundle(bundle: FhirBundle): TrialMatcherPatient | null 
     lastVisit: getLastVisit(encounters),
   };
 
-  const trialMatches = Object.fromEntries(
+  // Run hardcoded trial matching rules
+  const hardcodedMatches = Object.fromEntries(
     Object.entries(TRIAL_MATCHERS).map(([nct, fn]) => [nct, fn(base)])
   );
+
+  // Run dynamic Firestore trial rules
+  const dynamicMatches = Object.fromEntries(
+    firestoreTrials
+      .filter(t => t.matchingRules?.length > 0)
+      .map(t => [t.nctId, evaluateFirestoreTrial(base, t.matchingRules)])
+  );
+
+  const trialMatches = { ...hardcodedMatches, ...dynamicMatches };
 
   const statusOrder: Record<string, number> = { LIKELY_ELIGIBLE: 3, REVIEW_REQUIRED: 2, EXCLUDED: 1 };
   const best = Object.entries(trialMatches)
@@ -380,8 +459,13 @@ export function parseFhirBundle(bundle: FhirBundle): TrialMatcherPatient | null 
   return { ...base, trialMatches, bestMatch: { trialId: best[0], score: best[1].score, status: best[1].status } };
 }
 
-export function parseFhirBundles(bundles: FhirBundle[]): TrialMatcherPatient[] {
-  return bundles.map(parseFhirBundle).filter((p): p is TrialMatcherPatient => p !== null);
+export function parseFhirBundles(
+  bundles: FhirBundle[],
+  firestoreTrials: Array<{ nctId: string; matchingRules: any[] }> = []
+): TrialMatcherPatient[] {
+  return bundles
+    .map(b => parseFhirBundle(b, firestoreTrials))
+    .filter((p): p is TrialMatcherPatient => p !== null);
 }
 
 export function parseFhirBundleJson(json: string): TrialMatcherPatient | null {

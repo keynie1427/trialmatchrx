@@ -14,7 +14,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import IRBLogExport from '@/components/IRBLogExport';
 import {
   Search,
   CheckCircle2,
@@ -262,14 +261,14 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
   }
 
   const ptTrialData = patient.trialMatches[detailTrialId];
-  const detailTrial = TRIALS[detailTrialId];
+  const detailTrial = allTrials[detailTrialId];
 
   return (
     <div className="flex-1 overflow-y-auto p-5">
       {/* Patient header */}
       <div className="flex items-start gap-4 mb-6">
         <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl flex-shrink-0"
-          style={{ background: TRIALS[detailTrialId]?.colorLight }}>
+          style={{ background: allTrials[detailTrialId]?.colorLight }}>
           {CANCER_EMOJI[patient.cancerType] || '🔬'}
         </div>
         <div className="flex-1 min-w-0">
@@ -288,7 +287,7 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
         Trial match overview
       </h3>
       <div className="grid grid-cols-3 gap-3 mb-6">
-        {Object.values(TRIALS).map((t) => {
+        {Object.values(allTrials).map((t) => {
           const td = patient.trialMatches[t.nctId];
           const isActive = detailTrialId === t.nctId;
           return (
@@ -395,7 +394,7 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode }: {
           View {detailTrialId} on ClinicalTrials.gov
         </a>
         <button
-          onClick={() => generatePatientReport(patient, TRIALS)}
+          onClick={() => generatePatientReport(patient, allTrials)}
           className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 transition-colors"
         >
           <Download className="w-3 h-3" /> Patient report
@@ -409,7 +408,7 @@ function CompareTable({ patients, onSelect }: {
   patients: TrialMatcherPatient[];
   onSelect: (p: TrialMatcherPatient) => void;
 }) {
-  const trialIds = Object.keys(TRIALS);
+  const trialIds = Object.keys(allTrials);
   return (
     <div className="flex-1 overflow-auto">
       <table className="w-full text-sm border-collapse">
@@ -420,8 +419,8 @@ function CompareTable({ patients, onSelect }: {
             <th className="text-left p-3 font-semibold text-surface-600 dark:text-surface-400 border-b border-surface-200 dark:border-surface-700">Age / Sex</th>
             {trialIds.map((id) => (
               <th key={id} className="text-left p-3 font-semibold border-b border-surface-200 dark:border-surface-700"
-                style={{ color: TRIALS[id].color }}>
-                {TRIALS[id].shortName}
+                style={{ color: allTrials[id].color }}>
+                {allTrials[id].shortName}
               </th>
             ))}
             <th className="text-left p-3 font-semibold text-surface-600 dark:text-surface-400 border-b border-surface-200 dark:border-surface-700">Best match</th>
@@ -443,8 +442,8 @@ function CompareTable({ patients, onSelect }: {
                 </td>
               ))}
               <td className="p-3">
-                <span className="text-xs font-bold" style={{ color: TRIALS[p.bestMatch.trialId]?.color }}>
-                  {TRIALS[p.bestMatch.trialId]?.shortName}
+                <span className="text-xs font-bold" style={{ color: allTrials[p.bestMatch.trialId]?.color }}>
+                  {allTrials[p.bestMatch.trialId]?.shortName}
                 </span>
               </td>
             </tr>
@@ -469,6 +468,7 @@ export default function TrialMatcherPage() {
   const [patients, setPatients]           = useState<TrialMatcherPatient[]>(STATIC_PATIENTS);
   const [dataSource, setDataSource]       = useState<'static' | 'fhir' | 'loading'>('static');
   const [dataError, setDataError]         = useState<string | null>(null);
+  const [allTrials, setAllTrials]         = useState<typeof TRIALS>(TRIALS);
 
   // Notification state
   const [notifCount, setNotifCount]       = useState(0);
@@ -530,6 +530,14 @@ export default function TrialMatcherPage() {
       if (data.patients && data.patients.length > 0) {
         setPatients(data.patients);
         setDataSource('fhir');
+        // Merge Firestore trials into the trials map
+        if (data.firestoreTrials?.length > 0) {
+          const merged = { ...TRIALS };
+          data.firestoreTrials.forEach((t: any) => {
+            if (!merged[t.nctId]) merged[t.nctId] = t;
+          });
+          setAllTrials(merged);
+        }
       } else {
         // API returned empty — stay on static data
         setPatients(STATIC_PATIENTS);
@@ -578,7 +586,7 @@ export default function TrialMatcherPage() {
 
   const trialStats = useMemo(() =>
     Object.fromEntries(
-      Object.keys(TRIALS).map((id) => [id, {
+      Object.keys(allTrials).map((id) => [id, {
         eligible: patients.filter((p) => p.trialMatches[id].status === 'LIKELY_ELIGIBLE').length,
         review:   patients.filter((p) => p.trialMatches[id].status === 'REVIEW_REQUIRED').length,
       }])
@@ -662,13 +670,14 @@ export default function TrialMatcherPage() {
                 </Link>
               )}
 
-              {/* IRB Export dropdown */}
-              <IRBLogExport
-                trial={TRIALS[activeTrial]}
-                trials={TRIALS}
-                patients={patients}
-                selectedPatient={selectedPt}
-              />
+              {/* PDF export */}
+              <button
+                onClick={() => generateTrialReport(allTrials[activeTrial], patients)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors"
+                title="Export trial prescreen report as PDF"
+              >
+                <Download className="w-3.5 h-3.5" /> Export PDF
+              </button>
 
               {/* Notification bell */}
               <div className="relative">
@@ -768,7 +777,7 @@ export default function TrialMatcherPage() {
             <div className="p-3 border-b border-surface-100 dark:border-surface-800">
               <p className="text-[9px] font-bold text-surface-400 uppercase tracking-wider mb-2">Active Trials</p>
               <div className="space-y-1">
-                {Object.values(TRIALS).map((t) => (
+                {Object.values(allTrials).map((t) => (
                   <TrialSidebarBtn
                     key={t.nctId} trial={t} active={activeTrial === t.nctId}
                     eligibleCount={trialStats[t.nctId]?.eligible ?? 0}
@@ -806,7 +815,7 @@ export default function TrialMatcherPage() {
             {/* Trial info bar */}
             <div className="bg-white dark:bg-surface-900 border-b border-surface-200 dark:border-surface-700 px-5 py-2.5 flex items-center gap-3 flex-wrap flex-shrink-0">
               {(() => {
-                const t = TRIALS[activeTrial];
+                const t = allTrials[activeTrial];
                 return (
                   <>
                     <span className="text-sm font-bold px-3 py-1 rounded-full"
