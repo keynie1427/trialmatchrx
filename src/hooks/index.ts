@@ -276,7 +276,7 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
         let nearestDistance = Infinity;
         let nearestLocationIndex = 0;
         
-        for (let i = 0; i < trial.locations.length; i++) {
+        for (let i = 0; i < (trial.locations ?? []).length; i++) {
           const loc = trial.locations[i];
           if (loc.latitude && loc.longitude) {
             const dist = calculateDistance(
@@ -301,7 +301,7 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
         }
         
         // Reorder locations to put nearest first
-        if (nearestLocationIndex > 0 && trial.locations.length > 0) {
+        if (nearestLocationIndex > 0 && (trial.locations ?? []).length > 0) {
           const nearestLoc = trial.locations[nearestLocationIndex];
           const reorderedLocations = [
             nearestLoc,
@@ -621,13 +621,13 @@ function normalizeConditions(conditions: string[]): string[] {
 
 function calculateMatchScore(trial: Trial & { nearestDistance?: number }, criteria: SearchCriteria): number {
   let score = 50;
-  if (criteria.cancerType && trial.conditionsNormalized.some(c => c.toLowerCase().includes(criteria.cancerType!.toLowerCase()))) score += 20;
-  if (criteria.stage && trial.stages.includes(criteria.stage)) score += 10;
+  if (criteria.cancerType && (trial.conditionsNormalized ?? []).some(c => c.toLowerCase().includes(criteria.cancerType!.toLowerCase()))) score += 20;
+  if (criteria.stage && (trial.stages ?? []).includes(criteria.stage)) score += 10;
   if (criteria.biomarkers && criteria.biomarkers.length > 0) {
-    const matched = criteria.biomarkers.filter(b => trial.biomarkers.includes(b));
+    const matched = criteria.biomarkers.filter(b => (trial.biomarkers ?? []).includes(b));
     score += (matched.length / criteria.biomarkers.length) * 15;
   }
-  if (trial.phase.includes('3')) score += 5;
+  if ((trial.phase ?? '').includes('3')) score += 5;
   if (trial.status === 'Recruiting') score += 5;
   
   // Bonus for nearby trials
@@ -670,9 +670,9 @@ export function useTrialSearch() {
         trial,
         matchScore: calculateMatchScore(trial, finalCriteria),
         matchReasons: [
-          { factor: 'Cancer Type', weight: 10, matched: !!finalCriteria.cancerType && trial.conditions.some((c: string) => c.toLowerCase().includes(finalCriteria.cancerType!.toLowerCase())) },
+          { factor: 'Cancer Type', weight: 10, matched: !!finalCriteria.cancerType && (trial.conditions ?? []).some((c: string) => c.toLowerCase().includes(finalCriteria.cancerType!.toLowerCase())) },
           { factor: 'Recruiting Status', weight: 10, matched: trial.status === 'Recruiting' },
-          { factor: 'Biomarkers', weight: 8, matched: (finalCriteria.biomarkers || []).some((b: string) => trial.biomarkers.includes(b)) },
+          { factor: 'Biomarkers', weight: 8, matched: (finalCriteria.biomarkers || []).some((b: string) => (trial.biomarkers ?? []).includes(b)) },
           { factor: 'Location', weight: 7, matched: trial.nearestDistance !== undefined && trial.nearestDistance < (finalCriteria.distance || 100) },
         ],
         distance: trial.nearestDistance,
