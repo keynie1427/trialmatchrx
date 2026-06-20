@@ -172,7 +172,7 @@ export default function QueryExpansion({
   }
 
   // No expansion data or nothing useful to show
-  if (!expansion || (expansion.suggestions.length === 0 && expansion.relatedBiomarkers.length === 0)) {
+  if (!expansion || ((expansion.suggestions ?? []).length === 0 && (expansion.relatedBiomarkers ?? []).length === 0)) {
     return null;
   }
 
@@ -229,14 +229,14 @@ export default function QueryExpansion({
             className="space-y-4"
           >
             {/* Quick Suggestions */}
-            {expansion.suggestions.length > 0 && (
+            {(expansion.suggestions ?? []).length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Lightbulb className="w-3.5 h-3.5 text-surface-400" />
                   <span className="text-xs font-medium text-surface-500">Try these searches</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {expansion.suggestions.map((suggestion, index) => {
+                  {(expansion.suggestions ?? []).map((suggestion, index) => {
                     const style = suggestionStyles[suggestion.type] || suggestionStyles.synonym;
                     const Icon = style.icon;
 
@@ -260,14 +260,14 @@ export default function QueryExpansion({
             )}
 
             {/* Related Biomarkers */}
-            {expansion.relatedBiomarkers.length > 0 && (
+            {(expansion.relatedBiomarkers ?? []).length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 mb-2">
                   <Dna className="w-3.5 h-3.5 text-surface-400" />
                   <span className="text-xs font-medium text-surface-500">Related biomarkers</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {expansion.relatedBiomarkers.map((biomarker) => (
+                  {(expansion.relatedBiomarkers ?? []).map((biomarker) => (
                     <button
                       key={biomarker}
                       onClick={() => handleSuggestionClick(`${query} ${biomarker}`)}
@@ -281,16 +281,16 @@ export default function QueryExpansion({
             )}
 
             {/* Broader / Narrower Terms */}
-            {(expansion.broaderTerms.length > 0 || expansion.narrowerTerms.length > 0) && (
+            {((expansion.broaderTerms ?? []).length > 0 || (expansion.narrowerTerms ?? []).length > 0) && (
               <div className="flex flex-wrap gap-4">
-                {expansion.broaderTerms.length > 0 && (
+                {(expansion.broaderTerms ?? []).length > 0 && (
                   <div>
                     <div className="flex items-center gap-1.5 mb-2">
                       <Zap className="w-3.5 h-3.5 text-surface-400" />
                       <span className="text-xs font-medium text-surface-500">Broader search</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {expansion.broaderTerms.map((term) => (
+                      {(expansion.broaderTerms ?? []).map((term) => (
                         <button
                           key={term}
                           onClick={() => handleSuggestionClick(term)}
@@ -303,14 +303,14 @@ export default function QueryExpansion({
                   </div>
                 )}
 
-                {expansion.narrowerTerms.length > 0 && (
+                {(expansion.narrowerTerms ?? []).length > 0 && (
                   <div>
                     <div className="flex items-center gap-1.5 mb-2">
                       <Target className="w-3.5 h-3.5 text-surface-400" />
                       <span className="text-xs font-medium text-surface-500">More specific</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {expansion.narrowerTerms.map((term) => (
+                      {(expansion.narrowerTerms ?? []).map((term) => (
                         <button
                           key={term}
                           onClick={() => handleSuggestionClick(term)}
@@ -326,14 +326,14 @@ export default function QueryExpansion({
             )}
 
             {/* Synonyms */}
-            {expansion.synonyms.length > 0 && (
+            {(expansion.synonyms ?? []).length > 0 && (
               <div className="pt-3 border-t border-surface-200 dark:border-surface-700">
                 <div className="flex items-center gap-1.5 mb-2">
                   <Tag className="w-3.5 h-3.5 text-surface-400" />
                   <span className="text-xs font-medium text-surface-500">Also known as</span>
                 </div>
                 <div className="space-y-1.5">
-                  {expansion.synonyms.slice(0, 3).map((syn, index) => (
+                  {(expansion.synonyms ?? []).slice(0, 3).map((syn, index) => (
                     <div key={index} className="text-xs text-surface-600 dark:text-surface-400">
                       <span className="font-medium">{syn.term}</span>
                       <span className="text-surface-400 mx-1">→</span>
