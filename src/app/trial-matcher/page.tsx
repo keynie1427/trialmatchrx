@@ -1,6 +1,7 @@
 'use client';
 
 // src/app/trial-matcher/page.tsx
+// Updated with Quantum Match integration
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,7 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, CheckCircle2, XCircle, AlertTriangle, Dna, FlaskConical,
   Stethoscope, ClipboardList, LayoutGrid, List, ExternalLink,
-  Users, LogOut, Loader2, Download, Bell, ShieldCheck,
+  Users, LogOut, Loader2, Download, Bell, ShieldCheck, Atom,
+  Sparkles, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -36,6 +38,331 @@ const BIOMARKER_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 type AllTrials = Record<string, TrialDefinition>;
+
+// =============================================================================
+// QUANTUM TYPES
+// =============================================================================
+
+interface QuantumResult {
+  trial: {
+    nctId: string;
+    briefTitle: string;
+    phase: string;
+    indication: string;
+    drug: string;
+    sponsor: string;
+    status: string;
+  };
+  matchScore: number;
+  eligible: boolean;
+  breakdown: {
+    cancerTypeMatch: number;
+    biomarkerMatch: number;
+    stageMatch: number;
+    treatmentHistoryMatch: number;
+    ecogMatch: number;
+    phasePreference: number;
+  };
+  matchReasons: { factor: string; matched: boolean; weight: number }[];
+  concerns: string[];
+  aiSummary: string;
+  quantumOutput: number;
+}
+
+interface QuantumResponse {
+  results: QuantumResult[];
+  total: number;
+  eligibleCount: number;
+  quantumEnabled: boolean;
+  aiEnabled: boolean;
+  aiSummary: string;
+}
+
+// =============================================================================
+// QUANTUM MATCH PANEL
+// =============================================================================
+
+function QuantumMatchPanel({
+  patient,
+  onClose,
+}: {
+  patient: TrialMatcherPatient;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<QuantumResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const runQuantumMatch = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setResults(null);
+
+    // Build PatientProfile from TrialMatcherPatient
+    const positiveMarkers = Object.entries(patient.biomarkers)
+      .filter(([, v]) => v === 'Positive')
+      .map(([k]) => k.toUpperCase());
+
+    const profile = {
+      cancerType: patient.cancerType,
+      stage: patient.stage ?? 'Stage IV',
+      biomarkers: positiveMarkers,
+      priorTreatments: patient.priorTreatments.map((t) => ({
+        treatment: t,
+        type: t,
+        current: false,
+      })),
+      treatmentNaive: patient.priorTreatments.length === 0,
+      ecogStatus: patient.ecog ?? 1,
+      preferredPhases: ['Phase 2', 'Phase 2/Phase 3', 'Phase 3'],
+    };
+
+    try {
+      const res = await fetch('/api/ai/quantum-match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile, useFirestore: true, limit: 15 }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Quantum matching failed');
+      }
+
+      const data: QuantumResponse = await res.json();
+      setResults(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, [patient]);
+
+  // Auto-run on mount
+  useEffect(() => { runQuantumMatch(); }, [runQuantumMatch]);
+
+  const scoreColor = (score: number) =>
+    score >= 70 ? 'text-emerald-600 dark:text-emerald-400' :
+    score >= 50 ? 'text-amber-600 dark:text-amber-400' :
+    'text-red-500 dark:text-red-400';
+
+  const scoreBg = (score: number) =>
+    score >= 70 ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800/40' :
+    score >= 50 ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40' :
+    'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40';
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+            <Atom className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-surface-900 dark:text-surface-100">
+              Quantum Match — {patient.patientId}
+            </h3>
+            <p className="text-xs text-surface-500 dark:text-surface-400">
+              {patient.cancerType} · QAOA optimizer · Claude AI explanations
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={runQuantumMatch}
+            disabled={loading}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 hover:bg-violet-200 transition-colors disabled:opacity-40">
+            {loading ? 'Running…' : '↻ Re-run'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-xs text-surface-400 hover:text-surface-600 px-2 py-1.5 rounded-lg hover:bg-surface-100 transition-colors">
+            ✕ Close
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto p-5">
+        {/* Loading */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-12 h-12 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+              <Atom className="w-6 h-6 text-violet-600 animate-spin" />
+            </div>
+            <div className="text-center">
+              <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">Running quantum optimization…</p>
+              <p className="text-xs text-surface-500 mt-1">QAOA circuit · 50 iterations · Claude analysis</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && !loading && (
+          <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
+            <p className="text-sm font-bold text-red-800 dark:text-red-300 flex items-center gap-2">
+              <XCircle className="w-4 h-4" /> Quantum service unavailable
+            </p>
+            <p className="text-xs text-red-700 dark:text-red-400 mt-1">{error}</p>
+            <p className="text-xs text-red-600 dark:text-red-500 mt-2">
+              Make sure the quantum API is running: <code className="bg-red-100 dark:bg-red-900/40 px-1 rounded">python3 ~/quantum_api.py</code>
+            </p>
+            <button onClick={runQuantumMatch}
+              className="mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 transition-colors">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Results */}
+        {results && !loading && (
+          <>
+            {/* Summary bar */}
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40 mb-5">
+              <Atom className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0" />
+              <p className="text-xs text-violet-800 dark:text-violet-300 flex-1">{results.aiSummary}</p>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
+                  {results.eligibleCount} eligible
+                </span>
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-300">
+                  {results.total} analyzed
+                </span>
+              </div>
+            </div>
+
+            {/* Trial results */}
+            <div className="space-y-3">
+              {results.results.map((r, i) => (
+                <div key={r.trial.nctId}
+                  className={`rounded-xl border overflow-hidden ${scoreBg(r.matchScore)}`}>
+                  {/* Trial header */}
+                  <div className="flex items-start gap-3 p-4">
+                    {/* Rank + score */}
+                    <div className="flex-shrink-0 text-center">
+                      <div className={`text-2xl font-black ${scoreColor(r.matchScore)}`}>{r.matchScore}</div>
+                      <div className="text-[9px] font-bold text-surface-400 uppercase">score</div>
+                      <div className="text-[10px] font-bold text-surface-500 mt-0.5">#{i + 1}</div>
+                    </div>
+
+                    {/* Trial info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-surface-900 dark:text-surface-100 leading-snug">
+                            {r.trial.briefTitle}
+                          </p>
+                          <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
+                            {r.trial.nctId} · {r.trial.phase} · {r.trial.sponsor}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {r.eligible ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
+                              <CheckCircle2 className="w-3 h-3" /> Eligible
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
+                              <XCircle className="w-3 h-3" /> Ineligible
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Drug */}
+                      {r.trial.drug && r.trial.drug !== 'See protocol' && (
+                        <p className="text-xs font-semibold text-violet-700 dark:text-violet-400 mt-1.5">
+                          💊 {r.trial.drug}
+                        </p>
+                      )}
+
+                      {/* AI Summary */}
+                      {r.aiSummary && (
+                        <div className="mt-2 flex items-start gap-1.5">
+                          <Sparkles className="w-3 h-3 text-violet-500 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-surface-600 dark:text-surface-400 italic leading-relaxed">
+                            {r.aiSummary}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Score breakdown pills */}
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {[
+                          { label: 'Cancer', value: r.breakdown.cancerTypeMatch },
+                          { label: 'Biomarker', value: r.breakdown.biomarkerMatch },
+                          { label: 'Stage', value: r.breakdown.stageMatch },
+                          { label: 'Treatment Hx', value: r.breakdown.treatmentHistoryMatch },
+                          { label: 'ECOG', value: r.breakdown.ecogMatch },
+                        ].map(({ label, value }) => (
+                          <span key={label}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              value >= 1.0 ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300' :
+                              value > 0   ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300' :
+                                            'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                            }`}>
+                            {label} {Math.round(value * 100)}%
+                          </span>
+                        ))}
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300">
+                          ⚛ {r.quantumOutput > 0 ? '+' : ''}{r.quantumOutput.toFixed(3)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expandable details */}
+                  {(r.matchReasons.length > 0 || r.concerns.length > 0) && (
+                    <>
+                      <button
+                        onClick={() => setExpanded(expanded === r.trial.nctId ? null : r.trial.nctId)}
+                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-surface-500 hover:text-surface-700 border-t border-surface-200/50 dark:border-surface-700/50 bg-white/50 dark:bg-surface-800/30 transition-colors">
+                        <span>Match reasons & concerns</span>
+                        {expanded === r.trial.nctId ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </button>
+                      {expanded === r.trial.nctId && (
+                        <div className="px-4 pb-4 space-y-2 bg-white/50 dark:bg-surface-800/30">
+                          {r.matchReasons.map((reason, j) => (
+                            <div key={j} className="flex items-start gap-2 text-xs">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-surface-700 dark:text-surface-300">{reason.factor}</span>
+                            </div>
+                          ))}
+                          {r.concerns.map((concern, j) => (
+                            <div key={j} className="flex items-start gap-2 text-xs">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-surface-600 dark:text-surface-400">{concern}</span>
+                            </div>
+                          ))}
+                          <a href={`https://clinicaltrials.gov/study/${r.trial.nctId}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:underline mt-1">
+                            <ExternalLink className="w-3 h-3" /> View on ClinicalTrials.gov
+                          </a>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Footer note */}
+            <p className="text-[10px] text-surface-400 text-center mt-5 leading-relaxed">
+              Quantum-classical hybrid matching via QAOA + Claude AI · Results are decision-support only · Always verify with clinical team
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// EXISTING COMPONENTS (unchanged)
+// =============================================================================
 
 function AuthLoadingScreen() {
   return (
@@ -211,14 +538,14 @@ function PatientRow({ patient, activeTrial, selected, onClick }: {
   );
 }
 
-// DetailPanel receives allTrials as a prop to avoid closure issues
-function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode, allTrials, onPatientReport }: {
+function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode, allTrials, onPatientReport, onQuantumMatch }: {
   patient: TrialMatcherPatient | null;
   detailTrialId: string;
   onTrialSelect: (id: string) => void;
   viewMode: string;
   allTrials: AllTrials;
   onPatientReport: (p: TrialMatcherPatient) => void;
+  onQuantumMatch: (p: TrialMatcherPatient) => void;
 }) {
   if (!patient) {
     return (
@@ -248,6 +575,13 @@ function DetailPanel({ patient, detailTrialId, onTrialSelect, viewMode, allTrial
           </p>
           <BiomarkerTags biomarkers={patient.biomarkers} />
         </div>
+        {/* ⚛ Quantum Match Button */}
+        <button
+          onClick={() => onQuantumMatch(patient)}
+          className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-colors shadow-sm">
+          <Atom className="w-4 h-4" />
+          Quantum Match
+        </button>
       </div>
 
       <h3 className="text-xs font-bold text-surface-400 uppercase tracking-wider mb-3">Trial match overview</h3>
@@ -408,6 +742,10 @@ function CompareTable({ patients, onSelect, allTrials }: {
   );
 }
 
+// =============================================================================
+// MAIN PAGE
+// =============================================================================
+
 export default function TrialMatcherPage() {
   const router = useRouter();
   const { user, loading: authLoading, signOut } = useAuth();
@@ -432,6 +770,9 @@ export default function TrialMatcherPage() {
   const [cancerFilter, setCancerFilter]   = useState('all');
   const [search, setSearch]               = useState('');
   const [viewMode, setViewMode]           = useState<'list' | 'compare'>('list');
+
+  // Quantum state
+  const [quantumPatient, setQuantumPatient] = useState<TrialMatcherPatient | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -534,6 +875,7 @@ export default function TrialMatcherPage() {
 
   function handlePatientSelect(p: TrialMatcherPatient) {
     setSelectedPt(p); setDetailTrialId(activeTrial); setViewMode('list');
+    setQuantumPatient(null); // close quantum panel when switching patients
   }
 
   if (authLoading || accessChecking || !accessUser) return <AuthLoadingScreen />;
@@ -752,15 +1094,25 @@ export default function TrialMatcherPage() {
                         </AnimatePresence>
                     }
                   </div>
+
+                  {/* Detail / Quantum panel */}
                   <div className={`overflow-y-auto bg-surface-50 dark:bg-surface-900 min-w-0 flex-1 ${mobilePanel === 'detail' ? 'block' : 'hidden'} md:block`}>
-                    <DetailPanel
-                      patient={selectedPt}
-                      detailTrialId={detailTrialId}
-                      onTrialSelect={setDetailTrialId}
-                      viewMode={userRole}
-                      allTrials={allTrials}
-                      onPatientReport={(p) => generatePatientReport(p, allTrials)}
-                    />
+                    {quantumPatient ? (
+                      <QuantumMatchPanel
+                        patient={quantumPatient}
+                        onClose={() => setQuantumPatient(null)}
+                      />
+                    ) : (
+                      <DetailPanel
+                        patient={selectedPt}
+                        detailTrialId={detailTrialId}
+                        onTrialSelect={setDetailTrialId}
+                        viewMode={userRole}
+                        allTrials={allTrials}
+                        onPatientReport={(p) => generatePatientReport(p, allTrials)}
+                        onQuantumMatch={(p) => { setQuantumPatient(p); if (window.innerWidth < 768) setMobilePanel('detail'); }}
+                      />
+                    )}
                   </div>
                 </>
               )}
@@ -789,7 +1141,6 @@ export default function TrialMatcherPage() {
             Detail
           </button>
         </div>
-        {/* Mobile bottom nav spacer */}
         <div className="h-16 md:hidden flex-shrink-0" />
       </main>
     </div>
