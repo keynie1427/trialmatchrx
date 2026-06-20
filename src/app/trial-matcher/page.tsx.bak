@@ -506,7 +506,7 @@ export default function TrialMatcherPage() {
   const trialStats = useMemo(() =>
     Object.fromEntries(
       Object.keys(allTrials).map((id) => [id, {
-        eligible: patients.filter((p) => p.trialMatches?.[id]?.status === 'LIKELY_ELIGIBLE').length,
+        eligible: patients.filter((p) => p.trialMatches[id]?.status === 'LIKELY_ELIGIBLE').length,
         review:   patients.filter((p) => p.trialMatches[id]?.status === 'REVIEW_REQUIRED').length,
       }])
     ), [patients, allTrials]);

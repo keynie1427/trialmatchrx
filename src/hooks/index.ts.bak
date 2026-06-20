@@ -661,9 +661,7 @@ export function useTrialSearch() {
     setError(null);
 
     try {
-      const response = await searchClinicalTrialsGov(finalCriteria);
-      const trials = response?.trials ?? [];
-      const total = response?.total ?? 0;
+      const { trials, total } = await searchClinicalTrialsGov(finalCriteria);
       
       // Calculate match scores
       const searchResults: SearchResult[] = trials.map((trial: any) => ({

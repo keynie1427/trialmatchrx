@@ -1002,11 +1002,11 @@ export default function TrialMatcherAdminPage() {
                           {(parsedRules as any).validation.plausibilityFlag === 'low'  && <XCircle className="w-4 h-4 text-red-600" />}
                           {(parsedRules as any).validation.plausibilityFlag === 'high' && <AlertTriangle className="w-4 h-4 text-amber-600" />}
                           <span className="font-bold text-surface-900 dark:text-surface-100">
-                            Live validation: {(parsedRules as any).validation?.matchCount ?? 0} of {(parsedRules as any).validation?.totalPatients ?? 0} patients matched
+                            Live validation: {(parsedRules as any).validation.matchCount} of {(parsedRules as any).validation.totalPatients} patients matched
                           </span>
                         </div>
                         <p className="text-surface-600 dark:text-surface-400 leading-relaxed">
-                          {(parsedRules as any).validation?.plausibilityMessage}
+                          {(parsedRules as any).validation.plausibilityMessage}
                         </p>
                       </div>
                     )}
@@ -1015,16 +1015,16 @@ export default function TrialMatcherAdminPage() {
                     {(parsedRules as any).summary && (
                       <div className="flex gap-2 px-4 mt-3 flex-wrap">
                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300">
-                          ✓ {(parsedRules as any).summary?.autoConfirmed ?? 0} auto-confirmed
+                          ✓ {(parsedRules as any).summary.autoConfirmed} auto-confirmed
                         </span>
-                        {((parsedRules as any).summary?.needsReview ?? 0) > 0 && (
+                        {(parsedRules as any).summary.needsReview > 0 && (
                           <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
-                            ⚠ {(parsedRules as any).summary?.needsReview ?? 0} need review
+                            ⚠ {(parsedRules as any).summary.needsReview} need review
                           </span>
                         )}
-                        {((parsedRules as any).summary?.manualOnly ?? 0) > 0 && (
+                        {(parsedRules as any).summary.manualOnly > 0 && (
                           <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-surface-100 dark:bg-surface-800 text-surface-600">
-                            {(parsedRules as any).summary?.manualOnly ?? 0} manual only
+                            {(parsedRules as any).summary.manualOnly} manual only
                           </span>
                         )}
                       </div>
@@ -1032,7 +1032,7 @@ export default function TrialMatcherAdminPage() {
 
                     {/* Plain English rules */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-2 mt-2">
-                      {((parsedRules as any).rules ?? []).map((rule: any, i: number) => (
+                      {((parsedRules as any).rules || parsedRules as any[]).map((rule: any, i: number) => (
                         <div key={i} className={`p-3 rounded-xl border ${
                           rule.operator === 'manual'
                             ? 'bg-surface-50 dark:bg-surface-800/50 border-surface-200 dark:border-surface-700'

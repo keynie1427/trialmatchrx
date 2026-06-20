@@ -1,5 +1,4 @@
 import * as functions from 'firebase-functions';
-import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -196,7 +195,9 @@ export const aiMatch = functions.https.onRequest(async (req, res) => {
 // SYNC TRIALS (Scheduled)
 // =============================================================================
 
-export const syncTrials = onSchedule('every 24 hours', async () => {
+export const syncTrials = functions.pubsub
+  .schedule('every 24 hours')
+  .onRun(async (context) => {
     console.log('Starting trial sync...');
 
     try {
@@ -239,9 +240,10 @@ export const syncTrials = onSchedule('every 24 hours', async () => {
 // ALERTS (Scheduled)
 // =============================================================================
 
-export const processAlerts = onSchedule(
-  { schedule: 'every monday 09:00', timeZone: 'America/New_York' },
-  async () => {
+export const processAlerts = functions.pubsub
+  .schedule('every monday 09:00')
+  .timeZone('America/New_York')
+  .onRun(async (context) => {
     console.log('Processing alerts...');
 
     try {
