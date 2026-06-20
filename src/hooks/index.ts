@@ -666,6 +666,18 @@ export function useTrialSearch() {
       const total = response?.total ?? 0;
       
       // Calculate match scores
+      // DEBUG: log any trial missing expected array fields
+      trials.forEach((trial: any, i: number) => {
+        if (!trial.conditions || !trial.locations || !trial.biomarkers || !trial.stages || !trial.interventions) {
+          console.warn('Trial missing fields:', trial.nctId, {
+            conditions: trial.conditions,
+            locations: trial.locations,
+            biomarkers: trial.biomarkers,
+            stages: trial.stages,
+            interventions: trial.interventions,
+          });
+        }
+      });
       const searchResults: SearchResult[] = trials.map((trial: any) => ({
         trial,
         matchScore: calculateMatchScore(trial, finalCriteria),
