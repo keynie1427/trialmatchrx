@@ -49,3 +49,5 @@ coverage/
 *.log
 .vercel
 .env*.local
+service-account.json
+service-account.json
