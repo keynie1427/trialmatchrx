@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const health = await fetch(`${QUANTUM_API_URL}/health`, {
-      signal: AbortSignal.timeout(90000),
+      signal: AbortSignal.timeout(60000),
     });
     const data = await health.json();
     return NextResponse.json({ quantum: data, status: "online" });
