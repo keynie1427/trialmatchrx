@@ -122,7 +122,7 @@ function QuantumMatchPanel({
       const res = await fetch('/api/ai/quantum-match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, useFirestore: true, limit: 25 }),
+        body: JSON.stringify({ profile, useFirestore: true, limit: 15 }),
       });
 
       if (!res.ok) {
