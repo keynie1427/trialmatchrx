@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next';
 import type { Metadata } from 'next';
 import FeedbackWidget from '@/components/FeedbackWidget';
 import CookieConsent from '@/components/CookieConsent';
@@ -56,13 +57,16 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#05c8ae" />
-      </head>
+      
+    <script defer src="https://umami-production-34a68.up.railway.app/script.js" data-website-id="184a656c-831c-4fb7-831b-1d6d7b106a0d"></script>
+  </head>
       <body className="min-h-screen bg-mesh bg-fixed">
         <div className="relative min-h-screen bg-noise">
           {children}
           <FeedbackWidget />
           <CookieConsent />
         </div>
+        <Analytics />
       </body>
     </html>
   );

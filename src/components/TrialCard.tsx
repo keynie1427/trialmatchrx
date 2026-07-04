@@ -138,7 +138,7 @@ export default function TrialCard({ result, showMatchReasons = true, compact = f
             </div>
 
             <button
-              onClick={() => toggleSaved(trial.nctId)}
+              onClick={() => { toggleSaved(trial.nctId); if (typeof window !== "undefined" && (window as any).umami) (window as any).umami.track("trial_bookmarked", { nctId: trial.nctId }); }}
               className={`flex-shrink-0 p-2 rounded-xl transition-all ${
                 saved 
                   ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
@@ -456,7 +456,7 @@ export function TrialCardCompact({ trial }: { trial: Trial }) {
       </div>
       
       <button
-        onClick={() => toggleSaved(trial.nctId)}
+        onClick={() => { toggleSaved(trial.nctId); if (typeof window !== "undefined" && (window as any).umami) (window as any).umami.track("trial_bookmarked", { nctId: trial.nctId }); }}
         className={`p-2 rounded-lg transition-colors ${
           saved 
             ? 'text-primary-600 dark:text-primary-400'

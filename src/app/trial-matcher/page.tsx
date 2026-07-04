@@ -95,6 +95,7 @@ function QuantumMatchPanel({
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const runQuantumMatch = useCallback(async () => {
+    if (typeof window !== "undefined" && (window as any).umami) (window as any).umami.track("quantum_match_run");
     setLoading(true);
     setError(null);
     setResults(null);

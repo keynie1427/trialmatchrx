@@ -39,6 +39,7 @@ export default function SearchPage() {
 
   // Handle expanded query search - navigate with query param
   const handleExpandedSearch = (query: string) => {
+    if (typeof window !== "undefined" && (window as any).umami) (window as any).umami.track("trial_search", { query: query.slice(0, 50) });
     router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
