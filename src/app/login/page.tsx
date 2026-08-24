@@ -18,44 +18,22 @@ import {
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/hooks';
-import { analytics_events, identifyUser } from '@/lib/analytics';
 
-// In your sign in handler:
-const handleSignIn = async (email: string, password: string) => {
-  const userCredential = await signInWithEmailAndPassword(auth, email, password);
-
-  // Identify user
-  identifyUser(userCredential.user.uid);
-
-  // Track sign in
-  analytics_events.signIn();
-};
-
-// In your sign up handler:
-const handleSignUp = async (email: string, password: string) => {
-  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-
-  // Identify user
-  identifyUser(userCredential.user.uid);
-
-  // Track sign up
-  analytics_events.signUp();
-};
-
-type AuthMode = 'login' | 'signup' | 'forgot';
+type AuthMode = 'login' | 'waitlist' | 'forgot';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signUp, signInWithGoogle, resetPassword, isLoading, error: authError } = useAuth();
-  
+  const { signIn, signInWithGoogle, resetPassword, isLoading, error: authError } = useAuth();
+
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [organization, setOrganization] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,23 +44,29 @@ export default function LoginPage() {
       if (mode === 'login') {
         await signIn(email, password);
         router.push('/search');
-      } else if (mode === 'signup') {
-        if (password !== confirmPassword) {
-          setError('Passwords do not match');
-          return;
+      } else if (mode === 'waitlist') {
+        setWaitlistSubmitting(true);
+        const res = await fetch('/api/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, organization }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Something went wrong. Please try again.');
         }
-        if (password.length < 6) {
-          setError('Password must be at least 6 characters');
-          return;
-        }
-        await signUp(email, password, name);
-        router.push('/profile');
+        setSuccess("Thanks! We've received your request and will be in touch soon.");
+        setName('');
+        setEmail('');
+        setOrganization('');
       } else if (mode === 'forgot') {
         await resetPassword(email);
         setSuccess('Password reset email sent! Check your inbox.');
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
+    } finally {
+      setWaitlistSubmitting(false);
     }
   };
 
@@ -115,12 +99,12 @@ export default function LoginPage() {
             </Link>
             <h1 className="font-display text-2xl font-bold">
               {mode === 'login' && 'Welcome Back'}
-              {mode === 'signup' && 'Create Account'}
+              {mode === 'waitlist' && 'Request Access'}
               {mode === 'forgot' && 'Reset Password'}
             </h1>
             <p className="text-surface-600 dark:text-surface-400 mt-2">
               {mode === 'login' && 'Sign in to access your saved trials and preferences'}
-              {mode === 'signup' && 'Join to save trials and get personalized matches'}
+              {mode === 'waitlist' && 'Public sign-ups are currently closed. Tell us a bit about you and we’ll reach out.'}
               {mode === 'forgot' && "Enter your email and we'll send you a reset link"}
             </p>
           </div>
@@ -150,8 +134,8 @@ export default function LoginPage() {
               </motion.div>
             )}
 
-            {/* Google Sign In */}
-            {mode !== 'forgot' && (
+            {/* Google Sign In (existing accounts only — new Google sign-ins are rejected) */}
+            {mode === 'login' && (
               <>
                 <button
                   onClick={handleGoogleSignIn}
@@ -180,8 +164,8 @@ export default function LoginPage() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Name (signup only) */}
-              {mode === 'signup' && (
+              {/* Name (waitlist only) */}
+              {mode === 'waitlist' && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Full Name</label>
                   <div className="relative">
@@ -214,8 +198,22 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Password */}
-              {mode !== 'forgot' && (
+              {/* Organization (waitlist only) */}
+              {mode === 'waitlist' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Organization (optional)</label>
+                  <input
+                    type="text"
+                    value={organization}
+                    onChange={(e) => setOrganization(e.target.value)}
+                    placeholder="Hospital, clinic, or company"
+                    className="input"
+                  />
+                </div>
+              )}
+
+              {/* Password (login only — self-serve signup is closed) */}
+              {mode === 'login' && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Password</label>
                   <div className="relative">
@@ -240,25 +238,6 @@ export default function LoginPage() {
                 </div>
               )}
 
-              {/* Confirm Password (signup only) */}
-              {mode === 'signup' && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">Confirm Password</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="input pl-10"
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                </div>
-              )}
-
               {/* Forgot Password Link */}
               {mode === 'login' && (
                 <div className="text-right">
@@ -275,10 +254,10 @@ export default function LoginPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || waitlistSubmitting}
                 className="btn-primary w-full py-3 mt-2"
               >
-                {isLoading ? (
+                {isLoading || waitlistSubmitting ? (
                   <span className="flex items-center justify-center gap-2">
                     <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -289,7 +268,7 @@ export default function LoginPage() {
                 ) : (
                   <span className="flex items-center justify-center gap-2">
                     {mode === 'login' && 'Sign In'}
-                    {mode === 'signup' && 'Create Account'}
+                    {mode === 'waitlist' && 'Request Access'}
                     {mode === 'forgot' && 'Send Reset Link'}
                     <ArrowRight className="w-4 h-4" />
                   </span>
@@ -303,18 +282,18 @@ export default function LoginPage() {
                 <p className="text-surface-600 dark:text-surface-400">
                   Don't have an account?{' '}
                   <button
-                    onClick={() => { setMode('signup'); setError(''); }}
+                    onClick={() => { setMode('waitlist'); setError(''); setSuccess(''); }}
                     className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
                   >
-                    Sign up
+                    Request access
                   </button>
                 </p>
               )}
-              {mode === 'signup' && (
+              {mode === 'waitlist' && (
                 <p className="text-surface-600 dark:text-surface-400">
                   Already have an account?{' '}
                   <button
-                    onClick={() => { setMode('login'); setError(''); }}
+                    onClick={() => { setMode('login'); setError(''); setSuccess(''); }}
                     className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
                   >
                     Sign in
@@ -332,13 +311,11 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Terms */}
-          {mode === 'signup' && (
+          {/* Privacy note */}
+          {mode === 'waitlist' && (
             <p className="text-center text-xs text-surface-500 mt-6">
-              By creating an account, you agree to our{' '}
-              <Link href="/legal/terms" className="underline hover:text-surface-700">Terms of Service</Link>
-              {' '}and{' '}
-              <Link href="/legal/privacy" className="underline hover:text-surface-700">Privacy Policy</Link>
+              We only use this to follow up about access. See our{' '}
+              <Link href="/legal/privacy" className="underline hover:text-surface-700">Privacy Policy</Link>.
             </p>
           )}
         </motion.div>

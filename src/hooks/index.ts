@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  getAdditionalUserInfo,
+  deleteUser,
   signOut,
   sendPasswordResetEmail,
   User as FirebaseUser,
@@ -77,21 +78,36 @@ export function useAuth() {
     }
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
-    setError(null);
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } catch (err: any) {
-      setError(err.message);
-      throw err;
-    }
+  // Public self-serve signup is closed. New accounts are provisioned by an
+  // admin (see the trial-matcher whitelist model) or via the waitlist form
+  // on /login. This function is kept so any stray callers fail loudly
+  // instead of silently creating a Firebase Auth account.
+  const signUp = useCallback(async (_email: string, _password: string, _displayName?: string) => {
+    const message = 'Public sign-ups are currently closed. Please join the waitlist and we’ll be in touch.';
+    setError(message);
+    throw new Error(message);
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
     setError(null);
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+
+      // Google sign-in silently creates a brand-new Firebase Auth account on
+      // first use. Since public signup is closed, undo that account creation
+      // immediately if this wasn't an existing user.
+      const info = getAdditionalUserInfo(result);
+      if (info?.isNewUser) {
+        await deleteUser(result.user).catch(() => {
+          // Best-effort cleanup; even if delete fails we still sign the
+          // browser out and refuse to treat this as a valid session below.
+        });
+        await signOut(auth).catch(() => {});
+        const message = 'Public sign-ups are currently closed. If you already have an account, sign in with email instead.';
+        setError(message);
+        throw new Error(message);
+      }
     } catch (err: any) {
       setError(err.message);
       throw err;
