@@ -187,12 +187,20 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
   params.set('query.cond', queryParts.join(' '));
   params.set('filter.overallStatus', 'RECRUITING');
   params.set('pageSize', String(criteria.limit || 25));
+  params.set('countTotal', 'true');
   
   // Add biomarkers to search if specified
   if (criteria.biomarkers && criteria.biomarkers.length > 0) {
     params.set('query.term', criteria.biomarkers.join(' OR '));
   }
   
+  // Age / sex eligibility filtering (server-side via Essie advanced filter).
+  // Trials with no minimum/maximum age listed have no limit, so MISSING counts as a match.
+  const advancedFilter = buildEligibilityFilter(criteria);
+  if (advancedFilter) {
+    params.set('filter.advanced', advancedFilter);
+  }
+
   // Add location filtering - search by state from zip code
   if (criteria.zip) {
     const state = await getStateFromZip(criteria.zip);
@@ -201,7 +209,15 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
     }
   }
   
-  const response = await fetch(`${CTG_API}?${params.toString()}`);
+  let response = await fetch(`${CTG_API}?${params.toString()}`);
+
+  // If the API rejects the advanced filter, fall back to the plain query;
+  // age/sex are still enforced client-side below.
+  if (!response.ok && advancedFilter) {
+    console.warn('ClinicalTrials.gov rejected eligibility filter, falling back to client-side filtering');
+    params.delete('filter.advanced');
+    response = await fetch(`${CTG_API}?${params.toString()}`);
+  }
   
   if (!response.ok) {
     throw new Error('Search failed');
@@ -282,6 +298,12 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
     } as Trial;
   });
   
+  // Enforce age / sex eligibility client-side as well (guards against the
+  // fallback path above and any API-side quirks).
+  const preFilterCount = trials.length;
+  trials = trials.filter(trial => isEligibleByDemographics(trial, criteria));
+  const removedByDemographics = preFilterCount - trials.length;
+
   // Filter by distance if zip code provided
   if (criteria.zip && criteria.distance && criteria.distance > 0) {
     const userCoords = await getZipCoordinates(criteria.zip);
@@ -342,7 +364,34 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
     }
   }
   
-  return { trials, total: data.totalCount || trials.length };
+  const apiTotal = data.totalCount || 0;
+  return { trials, total: Math.max(apiTotal - removedByDemographics, trials.length) };
+}
+
+// Build a ClinicalTrials.gov Essie expression for age/sex eligibility
+function buildEligibilityFilter(criteria: SearchCriteria): string | null {
+  const clauses: string[] = [];
+  if (typeof criteria.age === 'number' && criteria.age >= 0) {
+    const age = Math.floor(criteria.age);
+    clauses.push(`(AREA[MinimumAge]RANGE[MIN, ${age} years] OR AREA[MinimumAge]MISSING)`);
+    clauses.push(`(AREA[MaximumAge]RANGE[${age} years, MAX] OR AREA[MaximumAge]MISSING)`);
+  }
+  // Note: "ALL" acts as a wildcard in Essie, so exclude the opposite sex instead.
+  if (criteria.sex === 'Male') clauses.push('NOT AREA[Sex]FEMALE');
+  if (criteria.sex === 'Female') clauses.push('NOT AREA[Sex]MALE');
+  return clauses.length ? clauses.join(' AND ') : null;
+}
+
+// Client-side check of a trial's age/sex eligibility against search criteria
+function isEligibleByDemographics(trial: Trial, criteria: SearchCriteria): boolean {
+  const elig = trial.eligibilityParsed;
+  if (!elig) return true;
+  if (typeof criteria.age === 'number') {
+    if (elig.minAge !== undefined && criteria.age < elig.minAge) return false;
+    if (elig.maxAge !== undefined && criteria.age > elig.maxAge) return false;
+  }
+  if (criteria.sex && elig.sex && elig.sex !== 'All' && elig.sex !== criteria.sex) return false;
+  return true;
 }
 
 // Zip code to state mapping (first 3 digits)
@@ -590,8 +639,12 @@ function mapPhase(phase?: string): TrialPhase {
 
 function parseAge(ageStr?: string): number | undefined {
   if (!ageStr) return undefined;
-  const match = ageStr.match(/(\d+)/);
-  return match ? parseInt(match[1], 10) : undefined;
+  const match = ageStr.match(/(\d+(?:\.\d+)?)\s*(year|month|week|day|hour|minute)?/i);
+  if (!match) return undefined;
+  const value = parseFloat(match[1]);
+  const unit = (match[2] || 'year').toLowerCase();
+  const divisor: Record<string, number> = { year: 1, month: 12, week: 52, day: 365, hour: 8760, minute: 525600 };
+  return value / (divisor[unit] || 1);
 }
 
 function extractBiomarkers(text: string): string[] {
@@ -689,6 +742,9 @@ export function useTrialSearch() {
           { factor: 'Cancer Type', weight: 10, matched: !!finalCriteria.cancerType && (trial.conditions ?? []).some((c: string) => c.toLowerCase().includes(finalCriteria.cancerType!.toLowerCase())) },
           { factor: 'Recruiting Status', weight: 10, matched: trial.status === 'Recruiting' },
           { factor: 'Biomarkers', weight: 8, matched: (finalCriteria.biomarkers || []).some((b: string) => (trial.biomarkers ?? []).includes(b)) },
+          ...(finalCriteria.age !== undefined || finalCriteria.sex
+            ? [{ factor: 'Age & Sex Eligibility', weight: 9, matched: true }]
+            : []),
           { factor: 'Location', weight: 7, matched: trial.nearestDistance !== undefined && trial.nearestDistance < (finalCriteria.distance || 100) },
         ],
         distance: trial.nearestDistance,

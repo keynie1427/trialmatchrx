@@ -39,6 +39,8 @@ export const analytics_events = {
     phaseCount?: number;
     hasPriorTreatment?: boolean;
     hasLocation?: boolean;
+    hasAge?: boolean;
+    sex?: string;
     distance?: number;
     aiQuery?: string;
     queryLength?: number;

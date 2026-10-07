@@ -12,7 +12,8 @@ import {
   Dna,
   MapPin,
   Clock,
-  Filter
+  Filter,
+  User
 } from 'lucide-react';
 import { useTrialSearch } from '@/hooks';
 import { CANCER_TYPES, BIOMARKERS, STAGES, PHASES, PRIOR_TREATMENTS } from '@/types';
@@ -39,9 +40,15 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
   const [priorTreatment, setPriorTreatment] = useState(criteria.priorTreatment || '');
   const [zip, setZip] = useState(criteria.zip || '');
   const [distance, setDistance] = useState(criteria.distance || 100);
+  const [age, setAge] = useState<string>(criteria.age !== undefined ? String(criteria.age) : '');
+  const [sex, setSex] = useState<'Male' | 'Female' | ''>(criteria.sex || '');
+
+  const parsedAge = age.trim() === '' ? undefined : Number(age);
+  const ageValid = parsedAge === undefined || (Number.isInteger(parsedAge) && parsedAge >= 0 && parsedAge <= 120);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!useAI && !ageValid) return;
 
     if (useAI && aiQuery.trim()) {
       // TRACK AI SEARCH
@@ -59,6 +66,8 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
         biomarkers: selectedBiomarkers.length > 0 ? selectedBiomarkers : undefined,
         phase: selectedPhases.length > 0 ? selectedPhases : undefined,
         priorTreatment: priorTreatment || undefined,
+        age: parsedAge,
+        sex: sex || undefined,
         zip: zip || undefined,
         distance: zip ? distance : undefined,
         status: ['Recruiting'],
@@ -73,6 +82,8 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
         phaseCount: selectedPhases.length,
         hasPriorTreatment: !!priorTreatment,
         hasLocation: !!zip,
+        hasAge: parsedAge !== undefined,
+        sex: sex || undefined,
         distance: zip ? distance : undefined
       });
 
@@ -84,7 +95,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     if (compact) {
       router.push('/search');
     }
-  }, [useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, zip, distance, search, searchWithAI, onSearch, compact, router]);
+  }, [useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, parsedAge, ageValid, sex, zip, distance, search, searchWithAI, onSearch, compact, router]);
 
   const toggleBiomarker = (biomarker: string) => {
     setSelectedBiomarkers(prev =>
@@ -108,6 +119,8 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     setSelectedBiomarkers([]);
     setSelectedPhases([]);
     setPriorTreatment('');
+    setAge('');
+    setSex('');
     setZip('');
     setDistance(100);
     setAiQuery('');
@@ -117,7 +130,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
   };
 
   const hasFilters = cancerType || stage || selectedBiomarkers.length > 0 ||
-                     selectedPhases.length > 0 || priorTreatment || zip;
+                     selectedPhases.length > 0 || priorTreatment || age || sex || zip;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -235,6 +248,47 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                   {PRIOR_TREATMENTS.map((treatment) => (
                     <option key={treatment} value={treatment}>{treatment}</option>
                   ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Age & Sex */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="search-age" className="flex items-center gap-2 text-sm font-medium mb-2">
+                  <User className="w-4 h-4 text-primary-500" />
+                  Age
+                </label>
+                <input
+                  id="search-age"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={120}
+                  step={1}
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  placeholder="Any age"
+                  className={`input ${!ageValid ? 'ring-2 ring-red-500' : ''}`}
+                  aria-invalid={!ageValid}
+                />
+                {!ageValid && (
+                  <p className="mt-1 text-xs text-red-600">Enter a whole number from 0 to 120</p>
+                )}
+              </div>
+              <div>
+                <label htmlFor="search-sex" className="block text-sm font-medium mb-2">
+                  Sex
+                </label>
+                <select
+                  id="search-sex"
+                  value={sex}
+                  onChange={(e) => setSex(e.target.value as 'Male' | 'Female' | '')}
+                  className="select"
+                >
+                  <option value="">Any</option>
+                  <option value="Female">Female</option>
+                  <option value="Male">Male</option>
                 </select>
               </div>
             </div>
@@ -396,7 +450,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || (!useAI && !ageValid)}
         className="btn-primary w-full py-4 text-lg"
       >
         {isLoading ? (

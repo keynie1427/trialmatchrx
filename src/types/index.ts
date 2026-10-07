@@ -228,6 +228,10 @@ export interface SearchCriteria {
   phase?: TrialPhase[];
   priorTreatment?: string;
   treatmentNaive?: boolean;
+
+  // Patient demographics (matched against trial eligibility)
+  age?: number; // years
+  sex?: 'Male' | 'Female';
   
   // Location
   zip?: string;
