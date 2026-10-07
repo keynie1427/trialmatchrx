@@ -40,6 +40,7 @@ export default function ProfilePage() {
     priorTreatments: [] as string[],
     treatmentNaive: false,
     age: '',
+    sex: '',
     ecogStatus: '',
     zip: '',
     searchRadius: '50',
@@ -72,6 +73,7 @@ export default function ProfilePage() {
         priorTreatments: profile.priorTreatments?.map(t => t.treatment) || [],
         treatmentNaive: profile.treatmentNaive || false,
         age: profile.age?.toString() || '',
+        sex: profile.sex || '',
         ecogStatus: profile.ecogStatus?.toString() || '',
         zip: profile.zip || '',
         searchRadius: profile.searchRadius?.toString() || '50', alertsEnabled: profile.alertsEnabled || false,
@@ -93,6 +95,7 @@ export default function ProfilePage() {
         priorTreatments: formData.priorTreatments.map(t => ({ treatment: t, type: 'other', current: false })) as any,
         treatmentNaive: formData.treatmentNaive,
         age: formData.age ? parseInt(formData.age) : undefined,
+        sex: (formData.sex || undefined) as any,
         ecogStatus: formData.ecogStatus ? parseInt(formData.ecogStatus) : undefined,
         zip: formData.zip,
         searchRadius: parseInt(formData.searchRadius),
@@ -306,6 +309,20 @@ export default function ProfilePage() {
                       min="18"
                       max="120"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Sex</label>
+                    <select
+                      value={formData.sex}
+                      onChange={(e) => setFormData(prev => ({ ...prev, sex: e.target.value }))}
+                      className="select"
+                    >
+                      <option value="">Prefer not to say</option>
+                      <option value="Female">Female</option>
+                      <option value="Male">Male</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <p className="mt-1 text-xs text-surface-500">Used to match trial eligibility</p>
                   </div>
                 </div>
               </div>

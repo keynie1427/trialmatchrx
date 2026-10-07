@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -16,6 +16,8 @@ import {
   User
 } from 'lucide-react';
 import { useTrialSearch } from '@/hooks';
+import { useUserStore } from '@/lib/store';
+import { extractDemographics } from '@/lib/demographics';
 import { CANCER_TYPES, BIOMARKERS, STAGES, PHASES, PRIOR_TREATMENTS } from '@/types';
 import type { SearchCriteria, CancerStage, TrialPhase } from '@/types';
 import { analytics_events } from '@/lib/analytics'; // ADD THIS IMPORT
@@ -42,6 +44,25 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
   const [distance, setDistance] = useState(criteria.distance || 100);
   const [age, setAge] = useState<string>(criteria.age !== undefined ? String(criteria.age) : '');
   const [sex, setSex] = useState<'Male' | 'Female' | ''>(criteria.sex || '');
+
+  const [prefilledFromProfile, setPrefilledFromProfile] = useState(false);
+
+  // Pre-fill age/sex from the signed-in user's saved profile (once, and only
+  // if the user hasn't already set them in this search).
+  const profile = useUserStore((s) => s.profile);
+  const didPrefill = useRef(false);
+  useEffect(() => {
+    if (didPrefill.current || !profile) return;
+    if (criteria.age !== undefined || criteria.sex) { didPrefill.current = true; return; }
+    let filled = false;
+    if (typeof profile.age === 'number' && !age) { setAge(String(profile.age)); filled = true; }
+    if ((profile.sex === 'Male' || profile.sex === 'Female') && !sex) { setSex(profile.sex); filled = true; }
+    didPrefill.current = true;
+    if (filled) setPrefilledFromProfile(true);
+  }, [profile, criteria.age, criteria.sex, age, sex]);
+
+  // Live preview of age/sex detected in the AI search text
+  const aiDetected = useMemo(() => extractDemographics(aiQuery), [aiQuery]);
 
   const parsedAge = age.trim() === '' ? undefined : Number(age);
   const ageValid = parsedAge === undefined || (Number.isInteger(parsedAge) && parsedAge >= 0 && parsedAge <= 120);
@@ -121,6 +142,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     setPriorTreatment('');
     setAge('');
     setSex('');
+    setPrefilledFromProfile(false);
     setZip('');
     setDistance(100);
     setAiQuery('');
@@ -185,8 +207,23 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                 className="input-lg pl-12 pr-4"
               />
             </div>
+            {(aiDetected.age !== undefined || aiDetected.sex) && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-surface-500">Will filter by:</span>
+                {aiDetected.age !== undefined && (
+                  <span className="px-2.5 py-1 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium">
+                    Age {aiDetected.age}
+                  </span>
+                )}
+                {aiDetected.sex && (
+                  <span className="px-2.5 py-1 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium">
+                    {aiDetected.sex}
+                  </span>
+                )}
+              </div>
+            )}
             <p className="mt-2 text-sm text-surface-500">
-              Tip: Include your cancer type, stage, biomarkers, and treatment history for best results
+              Tip: Include age, sex, cancer type, stage, biomarkers, and treatment history for best results
             </p>
           </motion.div>
         ) : (
@@ -292,6 +329,9 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                 </select>
               </div>
             </div>
+            {prefilledFromProfile && (
+              <p className="-mt-2 text-xs text-surface-500">Age and sex filled in from your profile</p>
+            )}
 
             {/* Biomarkers */}
             <div>

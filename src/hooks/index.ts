@@ -17,6 +17,7 @@ import { auth, db } from '@/lib/firebase';
 import { getUser, createUser, updateUserProfile, getTrial } from '@/lib/firestore';
 import { useUserStore, useSearchStore, useSavedTrialsStore, useUIStore } from '@/lib/store';
 import type { PatientProfile, SearchCriteria, SearchResult, Trial, TrialPhase } from '@/types';
+import { extractDemographics } from '@/lib/demographics';
 
 // =============================================================================
 // AUTH HOOK
@@ -769,7 +770,10 @@ export function useTrialSearch() {
     setError(null);
 
     try {
-      const simpleCriteria: Partial<SearchCriteria> = { query };
+      // Pull age/sex out of the text so they become real eligibility filters
+      // instead of keywords (keys are always set so stale values are cleared).
+      const { age, sex, cleanedQuery } = extractDemographics(query);
+      const simpleCriteria: Partial<SearchCriteria> = { query: cleanedQuery, age, sex };
       await search(simpleCriteria);
     } catch (err: any) {
       setError(err.message);
