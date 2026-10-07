@@ -21,6 +21,14 @@ import { useAuth } from '@/hooks';
 
 type AuthMode = 'login' | 'waitlist' | 'forgot';
 
+// Where to go after sign-in: honor ?next=/some/path (same-site paths only).
+function getRedirectTarget(): string {
+  if (typeof window === 'undefined') return '/search';
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  return '/search';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, signInWithGoogle, resetPassword, isLoading, error: authError } = useAuth();
@@ -43,7 +51,7 @@ export default function LoginPage() {
     try {
       if (mode === 'login') {
         await signIn(email, password);
-        router.push('/search');
+        router.push(getRedirectTarget());
       } else if (mode === 'waitlist') {
         setWaitlistSubmitting(true);
         const res = await fetch('/api/waitlist', {
@@ -73,7 +81,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-      router.push('/search');
+      router.push(getRedirectTarget());
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with Google');
     }

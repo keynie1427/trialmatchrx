@@ -790,7 +790,10 @@ export default function TrialMatcherPage() {
         router.replace('/trial-matcher/access-denied');
       }
     });
-  }, [user, authLoading, router]);
+    // Key on the email, not the user object: the auth hook updates the user
+    // object again after its Firestore lookup, which would re-run this check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email, authLoading, router]);
 
   const fetchPatients = useCallback(async () => {
     setDataSource('loading');

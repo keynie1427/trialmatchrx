@@ -39,6 +39,9 @@ export function useAuth() {
           photoURL: firebaseUser.photoURL || undefined,
         };
         setUser(basicUser);
+        // Auth state is known now — don't make pages wait on the Firestore
+        // profile lookup below (it can be slow or hang when offline).
+        setLocalLoading(false);
         
         // Try to fetch extended user data from Firestore (non-blocking)
         // Skip if browser is offline to avoid noisy console errors
