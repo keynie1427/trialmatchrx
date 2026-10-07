@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        max_tokens: 2048,
         system: SYSTEM_PROMPT,
         messages: [
           {
@@ -63,10 +63,15 @@ export async function POST(request: NextRequest) {
 
     let expansion;
     try {
-      const cleaned = expansionText.replace(/```json\s?|```/g, '').trim();
-      expansion = JSON.parse(cleaned);
+      // Tolerate code fences or stray prose around the JSON object
+      const start = expansionText.indexOf('{');
+      const end = expansionText.lastIndexOf('}');
+      if (start === -1 || end <= start) throw new Error('No JSON object in response');
+      expansion = JSON.parse(expansionText.slice(start, end + 1));
     } catch {
-      console.error('Failed to parse expansion JSON:', expansionText);
+      console.error(
+        `Failed to parse expansion JSON (stop_reason=${data.stop_reason}, ${expansionText.length} chars)`
+      );
       return NextResponse.json({
         originalQuery: query,
         expandedQueries: [query],
@@ -114,6 +119,9 @@ EXPANSION STRATEGIES:
 - Biomarkers: "NSCLC" → consider "EGFR", "ALK", "ROS1", "KRAS", "PD-L1"
 - Drug classes: "immunotherapy" → "checkpoint inhibitor", "PD-1", "PD-L1"
 - Staging: Include stage-specific searches if relevant
+
+KEEP IT CONCISE: at most 3 expandedQueries, 4 synonyms entries, 8 relatedBiomarkers,
+3 broaderTerms, 6 narrowerTerms, 4 suggestions (reason under 20 words), and an explanation under 40 words.
 
 You MUST respond with valid JSON (no markdown, no code fences):
 {
