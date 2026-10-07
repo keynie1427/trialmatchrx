@@ -1,58 +1,94 @@
 rules_version = '2';
 
+// SHARED PROJECT: this Firebase project (trialmatchrx-v2) serves BOTH
+// IVida Health and TrialMatchRx. Keep both sections whenever you publish,
+// from either codebase, or one app will lose access to its data.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if user is authenticated
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    // Helper function to check if user owns the document
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
-    // Trials collection - publicly readable, admin write only
+
+    // =====================================================================
+    // IVida Health
+    // =====================================================================
+
+    // Patients can only read/write their own data
+    match /patients/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Lab results — patient-owned
+    match /patients/{userId}/labResults/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Medications — patient-owned
+    match /patients/{userId}/medications/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Visits — patient-owned
+    match /patients/{userId}/visits/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Providers — patient-owned
+    match /patients/{userId}/providers/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Share tokens — patient creates, anyone with token can read (read-only)
+    match /shareTokens/{token} {
+      allow create: if request.auth != null;
+      allow read: if true;  // Public read for share links
+      allow update, delete: if request.auth != null
+        && request.auth.uid == resource.data.ownerId;
+    }
+
+    // Shared access log — audit trail
+    match /shareAccess/{docId} {
+      allow create: if true;  // Anyone viewing logs an access
+      allow read: if request.auth != null
+        && request.auth.uid == resource.data.ownerId;
+    }
+
+    // =====================================================================
+    // TrialMatchRx
+    // =====================================================================
+
+    // Trials — publicly readable, server-side writes only
     match /trials/{trialId} {
       allow read: if true;
-      allow write: if false; // Only Cloud Functions can write
+      allow write: if false;
     }
-    
-    // Users collection - users can read/write their own data
+
+    // Users — each user reads/writes only their own profile
     match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
-      
-      // Validate user document structure
-      function validUserData() {
-        let data = request.resource.data;
-        return data.keys().hasAll(['email', 'createdAt'])
-          && data.email is string
-          && data.email.size() > 0;
-      }
+      allow read, create, update, delete: if isOwner(userId);
     }
-    
-    // Alerts collection - users can manage their own alerts
+
+    // Alerts — users manage their own
     match /alerts/{alertId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
-    
-    // Search history - users can read their own searches
+
+    // Search history — users read their own
     match /searchHistory/{searchId} {
-      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow read, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
-    
-    // Trial Matcher whitelist - doc ID is the lowercase email.
+
+    // Trial Matcher whitelist — doc ID is the lowercase email.
     // A signed-in user may read only their own entry (the access check).
-    // All writes go through the admin API (firebase-admin bypasses rules).
+    // Writes go through the admin API (firebase-admin bypasses rules).
     match /trial_matcher_users/{email} {
       allow read: if isAuthenticated()
         && request.auth.token.email != null
@@ -60,7 +96,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Trial sync metadata - readable by all, writable only by admin/functions
+    // Trial sync metadata — public read, server-side writes only
     match /metadata/{docId} {
       allow read: if true;
       allow write: if false;
