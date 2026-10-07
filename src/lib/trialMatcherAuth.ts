@@ -43,7 +43,9 @@ export interface TrialMatcherUser {
 
 export type AccessResult =
   | { granted: true;  user: TrialMatcherUser }
-  | { granted: false; reason: 'not_authenticated' | 'not_whitelisted' | 'inactive' | 'error' };
+  | { granted: false; reason: 'not_authenticated' | 'not_whitelisted' | 'inactive' | 'error' | 'timeout' | 'permission_denied' };
+
+const ACCESS_CHECK_TIMEOUT_MS = 15000;
 
 /**
  * Checks whether the given email is on the trial_matcher_users whitelist.
@@ -57,7 +59,12 @@ export async function checkTrialMatcherAccess(email: string): Promise<AccessResu
     console.log('[TrialMatcherAuth] Checking email:', normalizedEmail);
 
     const docRef = doc(db, 'trial_matcher_users', normalizedEmail);
-    const docSnap = await getDoc(docRef);
+    const docSnap = await Promise.race([
+      getDoc(docRef),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('ACCESS_CHECK_TIMEOUT')), ACCESS_CHECK_TIMEOUT_MS)
+      ),
+    ]);
 
     console.log('[TrialMatcherAuth] Document exists:', docSnap.exists());
     console.log('[TrialMatcherAuth] Document data:', docSnap.data());
@@ -90,8 +97,13 @@ export async function checkTrialMatcherAccess(email: string): Promise<AccessResu
         assignedTrialId: data.assignedTrialId ?? undefined,
       },
     };
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message === 'ACCESS_CHECK_TIMEOUT') {
+      console.error('[TrialMatcherAuth] Firestore did not respond within', ACCESS_CHECK_TIMEOUT_MS, 'ms');
+      return { granted: false, reason: 'timeout' };
+    }
     console.error('[TrialMatcherAuth] Firestore check failed:', err);
+    if (err?.code === 'permission-denied') return { granted: false, reason: 'permission_denied' };
     return { granted: false, reason: 'error' };
   }
 }

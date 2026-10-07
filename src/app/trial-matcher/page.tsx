@@ -753,6 +753,8 @@ export default function TrialMatcherPage() {
 
   const [accessChecking, setAccessChecking] = useState(false);
   const [accessUser, setAccessUser]         = useState<TrialMatcherUser | null>(null);
+  const [accessError, setAccessError]       = useState<string | null>(null);
+  const [accessAttempt, setAccessAttempt]   = useState(0);
 
   const [patients, setPatients]   = useState<TrialMatcherPatient[]>(STATIC_PATIENTS);
   const [dataSource, setDataSource] = useState<'static' | 'fhir' | 'loading'>('static');
@@ -781,11 +783,22 @@ export default function TrialMatcherPage() {
     const email = user.email;
     if (!email) { router.replace('/trial-matcher/access-denied'); return; }
     setAccessChecking(true);
+    setAccessError(null);
     checkTrialMatcherAccess(email).then((result) => {
       setAccessChecking(false);
       if (result.granted) {
         if (result.user.role === 'sponsor') { router.replace('/trial-matcher/sponsor'); return; }
         setAccessUser(result.user);
+      } else if (result.reason === 'timeout' || result.reason === 'error' || result.reason === 'permission_denied') {
+        // Couldn't reach Firestore — show a retryable error instead of
+        // spinning forever or wrongly saying access is denied.
+        setAccessError(
+          result.reason === 'timeout'
+            ? 'Could not reach the access database (no response after 15 seconds). A browser privacy setting, extension, VPN or network filter may be blocking Firebase.'
+            : result.reason === 'permission_denied'
+            ? 'The access check was blocked by Firestore security rules (permission denied). An administrator needs to allow signed-in users to read their own trial_matcher_users entry.'
+            : 'Something went wrong checking your access. Check the browser console for details.'
+        );
       } else {
         router.replace('/trial-matcher/access-denied');
       }
@@ -793,7 +806,7 @@ export default function TrialMatcherPage() {
     // Key on the email, not the user object: the auth hook updates the user
     // object again after its Firestore lookup, which would re-run this check.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.email, authLoading, router]);
+  }, [user?.email, authLoading, router, accessAttempt]);
 
   const fetchPatients = useCallback(async () => {
     setDataSource('loading');
@@ -880,6 +893,18 @@ export default function TrialMatcherPage() {
   function handlePatientSelect(p: TrialMatcherPatient) {
     setSelectedPt(p); setDetailTrialId(activeTrial); setViewMode('list');
     setQuantumPatient(null); // close quantum panel when switching patients
+  }
+
+  if (accessError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center">
+        <AlertTriangle className="w-8 h-8 text-amber-500" />
+        <p className="text-sm text-surface-600 dark:text-surface-300 max-w-md">{accessError}</p>
+        <button onClick={() => setAccessAttempt((n) => n + 1)} className="btn-primary px-4 py-2 text-sm">
+          Try again
+        </button>
+      </div>
+    );
   }
 
   if (authLoading || accessChecking || !accessUser) return <AuthLoadingScreen />;

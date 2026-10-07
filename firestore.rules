@@ -50,6 +50,16 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
     
+    // Trial Matcher whitelist - doc ID is the lowercase email.
+    // A signed-in user may read only their own entry (the access check).
+    // All writes go through the admin API (firebase-admin bypasses rules).
+    match /trial_matcher_users/{email} {
+      allow read: if isAuthenticated()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == email;
+      allow write: if false;
+    }
+
     // Trial sync metadata - readable by all, writable only by admin/functions
     match /metadata/{docId} {
       allow read: if true;
