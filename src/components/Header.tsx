@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth, useTheme, useSavedTrials } from '@/hooks';
 import { useT, usePrefsStore } from '@/lib/i18n';
+import { analytics_events } from '@/lib/analytics';
 
 function LanguageToggle({ className = '' }: { className?: string }) {
   const { lang } = useT();
@@ -32,7 +33,7 @@ function LanguageToggle({ className = '' }: { className?: string }) {
         <button
           key={l}
           type="button"
-          onClick={() => setLang(l)}
+          onClick={() => { if (l !== lang) analytics_events.languageChanged({ lang: l }); setLang(l); }}
           aria-pressed={lang === l}
           className={`px-2 py-1 rounded-md transition-colors ${lang === l ? 'bg-white dark:bg-surface-700 shadow-sm text-primary-700 dark:text-primary-300' : 'text-surface-500 hover:text-surface-800 dark:hover:text-surface-200'}`}
         >

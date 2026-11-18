@@ -54,7 +54,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     if (criteria.cancerType !== undefined) setCancerType(criteria.cancerType || '');
     if (criteria.zip !== undefined) setZip(criteria.zip || '');
   }, [criteria.cancerType, criteria.zip]);
-  const { t, audience } = useT();
+  const { t, audience, lang } = useT();
   const setAudience = usePrefsStore((s) => s.setAudience);
   const isCaregiver = audience === 'caregiver';
   const zipValid = zip === '' || /^\d{5}$/.test(zip);
@@ -87,8 +87,10 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
       // TRACK AI SEARCH
       analytics_events.trialSearch({
         searchType: 'ai',
-        aiQuery: aiQuery.trim(),
-        queryLength: aiQuery.trim().length
+        queryLength: aiQuery.trim().length,
+        hasLocation: !!zip,
+        audience,
+        lang,
       });
 
       await searchWithAI(aiQuery, zip && zipValid ? { zip, distance } : undefined);
@@ -117,7 +119,9 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
         hasLocation: !!zip,
         hasAge: parsedAge !== undefined,
         sex: sex || undefined,
-        distance: zip ? distance : undefined
+        distance: zip ? distance : undefined,
+        audience,
+        lang,
       });
 
       await search(searchCriteria);
@@ -128,7 +132,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     if (compact) {
       router.push('/search');
     }
-  }, [useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, parsedAge, ageValid, zipValid, sex, zip, distance, search, searchWithAI, onSearch, compact, router]);
+  }, [audience, lang, useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, parsedAge, ageValid, zipValid, sex, zip, distance, search, searchWithAI, onSearch, compact, router]);
 
   const toggleBiomarker = (biomarker: string) => {
     setSelectedBiomarkers(prev =>
@@ -181,7 +185,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               type="button"
               role="radio"
               aria-checked={audience === a}
-              onClick={() => setAudience(a)}
+              onClick={() => { setAudience(a); analytics_events.audienceSelected({ audience: a }); }}
               className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
                 audience === a
                   ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 ring-2 ring-primary-500'

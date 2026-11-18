@@ -95,7 +95,7 @@ export default function HomePage() {
                 <p className="text-lg text-surface-600 dark:text-surface-400 mb-8 max-w-lg">{t('hero.subtitle')}</p>
 
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Link href="/search" className="btn-primary text-lg px-8 py-4">
+                  <Link href="/search" className="btn-primary text-lg px-8 py-4" data-umami-event="home_cta_search" data-umami-event-position="hero">
                     <Search className="w-5 h-5" />
                     {t('hero.cta')}
                   </Link>
@@ -287,6 +287,8 @@ export default function HomePage() {
                 <Link
                   key={c.slug}
                   href={`/trials/${c.slug}`}
+                  data-umami-event="home_cancer_type_click"
+                  data-umami-event-cancer={c.slug}
                   className="px-3 py-1.5 rounded-full text-sm bg-surface-100 dark:bg-surface-800 hover:bg-primary-100 dark:hover:bg-primary-900/40 hover:text-primary-700 transition-colors"
                 >
                   {c.name}
@@ -316,6 +318,8 @@ export default function HomePage() {
                 <p className="text-lg text-primary-100 mb-8 max-w-2xl mx-auto">{t('cta.desc')}</p>
                 <Link
                   href="/search"
+                  data-umami-event="home_cta_search"
+                  data-umami-event-position="bottom"
                   className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-primary-700 font-semibold text-lg hover:bg-primary-50 transition-colors shadow-lg"
                 >
                   {t('cta.button')}

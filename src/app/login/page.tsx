@@ -18,6 +18,7 @@ import {
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/hooks';
+import { analytics_events } from '@/lib/analytics';
 
 type AuthMode = 'login' | 'waitlist' | 'forgot';
 
@@ -51,6 +52,7 @@ export default function LoginPage() {
     try {
       if (mode === 'login') {
         await signIn(email, password);
+        analytics_events.signIn({ method: 'password' });
         router.push(getRedirectTarget());
       } else if (mode === 'waitlist') {
         setWaitlistSubmitting(true);
@@ -64,6 +66,7 @@ export default function LoginPage() {
           throw new Error(data.error || 'Something went wrong. Please try again.');
         }
         setSuccess("Thanks! We've received your request and will be in touch soon.");
+        analytics_events.accessRequested();
         setName('');
         setEmail('');
         setOrganization('');
@@ -81,6 +84,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
+      analytics_events.signIn({ method: 'google' });
       router.push(getRedirectTarget());
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with Google');
@@ -320,12 +324,14 @@ export default function LoginPage() {
           </div>
 
           {/* Privacy note */}
-          {mode === 'waitlist' && (
-            <p className="text-center text-xs text-surface-500 mt-6">
-              We only use this to follow up about access. See our{' '}
-              <Link href="/legal/privacy" className="underline hover:text-surface-700">Privacy Policy</Link>.
-            </p>
-          )}
+          <p className="text-center text-xs text-surface-500 mt-6">
+            {mode === 'waitlist' && 'We only use this to follow up about access. '}
+            By continuing you agree to our{' '}
+            <Link href="/legal/terms" className="underline hover:text-surface-700">Terms of Use</Link> and{' '}
+            <Link href="/legal/privacy" className="underline hover:text-surface-700">Privacy Policy</Link>, and
+            understand that TrialMatchRX does not provide{' '}
+            <Link href="/legal/disclaimer" className="underline hover:text-surface-700">medical advice</Link>.
+          </p>
         </motion.div>
       </main>
 

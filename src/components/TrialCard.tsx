@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useSavedTrials } from '@/hooks';
 import { useT } from '@/lib/i18n';
+import { analytics_events } from '@/lib/analytics';
 import { findMatchingTherapies, getNciDrugUrl, getFdaDrugUrl } from '@/lib/fda-therapies';
 import type { Trial, SearchResult, MatchReason } from '@/types';
 
@@ -144,7 +145,7 @@ export default function TrialCard({ result, showMatchReasons = true, compact = f
             </div>
 
             <button
-              onClick={() => { toggleSaved(trial.nctId); if (typeof window !== "undefined" && (window as any).umami) (window as any).umami.track("trial_bookmarked", { nctId: trial.nctId }); }}
+              onClick={() => { const wasSaved = isSaved(trial.nctId); toggleSaved(trial.nctId); wasSaved ? analytics_events.trialUnsave({ trialId: trial.nctId }) : analytics_events.trialSave({ trialId: trial.nctId, phase: trial.phase, source: 'card' }); }}
               className={`flex-shrink-0 p-2 rounded-xl transition-all ${
                 saved 
                   ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'
@@ -410,6 +411,7 @@ export default function TrialCard({ result, showMatchReasons = true, compact = f
             </Link>
             <a
               href={`https://clinicaltrials.gov/study/${trial.nctId}`}
+              onClick={() => analytics_events.trialCtgovVisit({ trialId: trial.nctId })}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-ghost text-sm py-2"
@@ -473,7 +475,7 @@ export function TrialCardCompact({ trial }: { trial: Trial }) {
       </div>
       
       <button
-        onClick={() => { toggleSaved(trial.nctId); if (typeof window !== "undefined" && (window as any).umami) (window as any).umami.track("trial_bookmarked", { nctId: trial.nctId }); }}
+        onClick={() => { const wasSaved = isSaved(trial.nctId); toggleSaved(trial.nctId); wasSaved ? analytics_events.trialUnsave({ trialId: trial.nctId }) : analytics_events.trialSave({ trialId: trial.nctId, phase: trial.phase, source: 'card' }); }}
         className={`p-2 rounded-lg transition-colors ${
           saved 
             ? 'text-primary-600 dark:text-primary-400'

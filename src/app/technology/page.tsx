@@ -126,7 +126,7 @@ export default function TechnologyPage() {
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/search" className="btn-primary">Try a search <ArrowRight className="w-4 h-4" /></Link>
+              <Link href="/search" className="btn-primary" data-umami-event="technology_cta_search">Try a search <ArrowRight className="w-4 h-4" /></Link>
               <Link href="/for-research-sites" className="btn-secondary">For research sites</Link>
               <Link href="/about" className="btn-secondary">About the team</Link>
             </div>

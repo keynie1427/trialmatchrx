@@ -19,6 +19,7 @@ import {
   Info,
 } from 'lucide-react';
 import { useT } from '@/lib/i18n';
+import { analytics_events } from '@/lib/analytics';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -86,6 +87,7 @@ export default function TrialAISummary({ trial, className = '' }: TrialAISummary
 
       const data = await res.json();
       setSummary(data.summary);
+      analytics_events.aiSummaryGenerated({ trialId: trial.nctId, lang, audience });
     } catch (err: any) {
       console.error('AI summary error:', err);
       setError(err.message || 'Failed to generate summary');

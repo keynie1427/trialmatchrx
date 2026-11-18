@@ -140,7 +140,7 @@ export default function AboutPage() {
               <Link href="/technology" className="btn-secondary">How our matching works</Link>
               <Link href="/legal/hipaa" className="btn-secondary">Privacy &amp; HIPAA</Link>
               <Link href="/for-research-sites" className="btn-secondary">For research sites</Link>
-              <Link href="/search" className="btn-primary">Search trials</Link>
+              <Link href="/search" className="btn-primary" data-umami-event="about_cta_search">Search trials</Link>
             </div>
           </div>
         </section>

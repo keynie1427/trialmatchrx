@@ -17,6 +17,8 @@ import Footer from '@/components/Footer';
 import SearchForm from '@/components/SearchForm';
 import TrialCard from '@/components/TrialCard';
 import QueryExpansion from '@/components/QueryExpansion';
+import MedicalNotice from '@/components/MedicalNotice';
+import { trackEvent } from '@/lib/analytics';
 import { useTrialSearch, useAuth } from '@/hooks';
 
 // Runs a search from the URL: /search?q=free+text  or  /search?cancerType=Breast+Cancer&zip=71101
@@ -61,7 +63,7 @@ export default function SearchPage() {
 
   // Handle expanded query search - navigate with query param
   const handleExpandedSearch = (query: string) => {
-    if (typeof window !== "undefined" && (window as any).umami) (window as any).umami.track("trial_search", { query: query.slice(0, 50) });
+    trackEvent('query_expansion_clicked');
     router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
@@ -195,6 +197,8 @@ export default function SearchPage() {
                   </div>
                 </div>
               </div>
+
+              {!isLoading && sortedResults.length > 0 && <MedicalNotice className="mb-4" />}
 
               {/* Smart Query Expansion - Shows when there's a search query */}
               {currentQuery && !isLoading && results.length > 0 && (

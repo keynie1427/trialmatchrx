@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Building2, CheckCircle2, Users, RefreshCw, BadgeCheck, Send, Loader2, FlaskConical } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import { analytics_events } from '@/lib/analytics';
 
 const BENEFITS = [
   {
@@ -54,6 +55,10 @@ export default function ForResearchSitesPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Something went wrong');
       setState('done');
+      analytics_events.siteClaimSubmitted({
+        requestType: form.requestType,
+        trialCount: (form.nctIds.match(/NCT\d{8}/gi) || []).length,
+      });
     } catch (err: any) {
       setError(err.message);
       setState('error');

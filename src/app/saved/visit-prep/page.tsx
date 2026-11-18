@@ -11,6 +11,7 @@ import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { useSavedTrials } from '@/hooks';
 import { useT } from '@/lib/i18n';
+import { analytics_events } from '@/lib/analytics';
 
 interface PrepTrial {
   nctId: string;
@@ -127,6 +128,7 @@ function VisitPrepInner() {
       if (!cancelled) {
         setTrials(out);
         setLoading(false);
+        if (out.length) analytics_events.visitPrepOpened({ trialCount: out.length });
       }
     })();
     return () => {
@@ -146,7 +148,7 @@ function VisitPrepInner() {
           <Link href="/saved" className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
             <ArrowLeft className="w-4 h-4" /> {es ? 'Volver a Guardados' : 'Back to Saved'}
           </Link>
-          <button onClick={() => window.print()} className="btn-primary text-sm" disabled={loading || trials.length === 0}>
+          <button onClick={() => { analytics_events.visitPrepPrinted({ trialCount: trials.length, lang }); window.print(); }} className="btn-primary text-sm" disabled={loading || trials.length === 0}>
             <Printer className="w-4 h-4" /> {es ? 'Imprimir / Guardar PDF' : 'Print / Save as PDF'}
           </button>
         </div>

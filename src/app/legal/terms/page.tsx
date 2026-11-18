@@ -2,15 +2,13 @@
 
 import React from 'react';
 
-const EFFECTIVE_DATE = 'January 30, 2026';
+const EFFECTIVE_DATE = 'November 18, 2026';
 const APP_NAME = 'TrialMatchRX';
 const CONTACT_EMAIL = 'trialmatchrx@ijelany.com';
 
 export default function TermsOfUsePage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="bg-white shadow-sm rounded-lg p-8 sm:p-12">
+    <>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Terms of Use</h1>
           <p className="text-sm text-gray-500 mb-8">Effective Date: {EFFECTIVE_DATE}</p>
 
@@ -41,7 +39,12 @@ export default function TermsOfUsePage() {
               <li>Saving and bookmarking clinical trials for later review</li>
               <li>Side-by-side comparison of clinical trial details</li>
               <li>User account management and personalization features</li>
-              <li>AI-powered trial matching and analysis (where available)</li>
+              <li>AI-powered trial matching, plain-language summaries and eligibility questions</li>
+              <li>Distance-based search using the ZIP code you enter</li>
+              <li>Email alerts about newly posted trials that match a saved search</li>
+              <li>Printable &quot;doctor visit&quot; sheets for saved trials</li>
+              <li>English and Spanish versions of key pages and AI summaries</li>
+              <li>Tools for research sites to request listing updates, and an invitation-only Trial Matcher for research teams</li>
             </ul>
           </Section>
 
@@ -98,7 +101,37 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="8. Disclaimer of Warranties">
+          <Section title="8. Match Scores, Distances and AI-Generated Content">
+            <p className="mb-2">
+              Match scores, &quot;why this matches&quot; explanations, distance estimates, plain-language summaries,
+              translations and AI answers are produced automatically from public trial listings and the information you
+              enter. They can be incomplete or wrong. For example, a trial&apos;s eligibility text may be ambiguous, a site
+              may have stopped recruiting, or a distance may be measured from your ZIP code&apos;s center.
+            </p>
+            <p>
+              They are a starting point for a conversation with your care team, not a determination that you are
+              eligible. Only the study team can decide whether you qualify for a trial.
+            </p>
+          </Section>
+
+          <Section title="9. Trial Alerts and Emails">
+            <p>
+              If you sign up for alerts, you agree that we may email you about trials that match your saved criteria.
+              Every alert email includes a one-click unsubscribe link, and you can also turn alerts off from your Alerts
+              page. We will not send you marketing for other companies.
+            </p>
+          </Section>
+
+          <Section title="10. Research Site Submissions">
+            <p>
+              If you submit a request on behalf of a research site or sponsor, you confirm that you are authorized to act
+              for that site or trial and that the information you provide is accurate. We verify requests against
+              public trial contacts before making changes, and we may decline any request. Listing details you provide
+              may be displayed publicly on the Service.
+            </p>
+          </Section>
+
+          <Section title="11. Disclaimer of Warranties">
             <p className="font-semibold text-gray-900">
               THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES
               OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES
@@ -108,7 +141,7 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="9. Limitation of Liability">
+          <Section title="12. Limitation of Liability">
             <p className="font-semibold text-gray-900">
               TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL{' '}
               {APP_NAME.toUpperCase()}, ITS OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, OR AFFILIATES BE
@@ -121,7 +154,7 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="10. Indemnification">
+          <Section title="13. Indemnification">
             <p>
               You agree to indemnify, defend, and hold harmless {APP_NAME}, its officers, directors,
               employees, agents, and affiliates from and against any and all claims, liabilities,
@@ -132,7 +165,7 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="11. Modifications to Terms">
+          <Section title="14. Modifications to Terms">
             <p>
               {APP_NAME} reserves the right to modify these Terms at any time. Changes will be
               effective immediately upon posting the revised Terms on the Service. Your continued use
@@ -140,7 +173,7 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="12. Termination">
+          <Section title="15. Termination">
             <p>
               We may terminate or suspend your access to the Service immediately, without prior notice
               or liability, for any reason whatsoever, including without limitation if you breach these
@@ -148,7 +181,7 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="13. Governing Law">
+          <Section title="16. Governing Law">
             <p>
               These Terms shall be governed by and construed in accordance with the laws of the State
               of Louisiana, without regard to its conflict of law provisions. Any disputes arising
@@ -157,7 +190,7 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="14. Severability">
+          <Section title="17. Severability">
             <p>
               If any provision of these Terms is held to be unenforceable or invalid, such provision
               will be changed and interpreted to accomplish the objectives of such provision to the
@@ -166,14 +199,12 @@ export default function TermsOfUsePage() {
             </p>
           </Section>
 
-          <Section title="15. Contact Information">
+          <Section title="18. Contact Information">
             <p>
               If you have questions about these Terms, please contact us at: {CONTACT_EMAIL}
             </p>
           </Section>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
 

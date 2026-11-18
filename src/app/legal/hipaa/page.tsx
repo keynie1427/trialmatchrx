@@ -8,9 +8,7 @@ const CONTACT_EMAIL = 'trialmatchrx@ijelany.com';
 
 export default function HipaaNoticePage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="bg-white shadow-sm rounded-lg p-8 sm:p-12">
+    <>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">HIPAA Notice</h1>
           <p className="text-sm text-gray-500 mb-8">Effective Date: {EFFECTIVE_DATE}</p>
 
@@ -139,9 +137,7 @@ export default function HipaaNoticePage() {
               please contact us at: {CONTACT_EMAIL}
             </p>
           </Section>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
 

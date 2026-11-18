@@ -124,7 +124,7 @@ export default async function CancerTypePage({ params }: { params: { slug: strin
               </p>
             )}
             <div className="flex flex-wrap gap-3">
-              <Link href={searchHref} className="btn-primary">
+              <Link href={searchHref} className="btn-primary" data-umami-event="cancer_page_cta" data-umami-event-cancer={c.slug} data-umami-event-position="top">
                 <Search className="w-4 h-4" /> Match these trials to my profile
               </Link>
               <Link href="/search" className="btn-secondary">Search by ZIP code</Link>
@@ -144,7 +144,7 @@ export default async function CancerTypePage({ params }: { params: { slug: strin
               <ul className="space-y-3">
                 {trials.map((t) => (
                   <li key={t.nctId} className="card p-5">
-                    <Link href={`/trial/${t.nctId}`} className="font-semibold hover:text-primary-600">
+                    <Link href={`/trial/${t.nctId}`} className="font-semibold hover:text-primary-600" data-umami-event="cancer_page_trial_click" data-umami-event-cancer={c.slug}>
                       {t.title}
                     </Link>
                     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-surface-500">
@@ -170,7 +170,7 @@ export default async function CancerTypePage({ params }: { params: { slug: strin
                   Add your stage, biomarkers, age and ZIP code to get a ranked list with a plain-language reason for every match.
                 </p>
               </div>
-              <Link href={searchHref} className="btn-primary whitespace-nowrap">
+              <Link href={searchHref} className="btn-primary whitespace-nowrap" data-umami-event="cancer_page_cta" data-umami-event-cancer={c.slug} data-umami-event-position="bottom">
                 Start matching <ArrowRight className="w-4 h-4" />
               </Link>
             </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { unsubscribeUrl } from '@/lib/unsubscribe';
 
 if (getApps().length === 0) {
   try {
@@ -84,7 +85,8 @@ export async function POST(request: NextRequest) {
 
         if (dryRun) { console.log(`[DRY RUN] Would send to ${prefs.email}:`, digest.subject); results.sent++; continue; }
 
-        await sendEmail({ to: prefs.email, subject: digest.subject, html: generateEmailHtml(digest, baseUrl) });
+        const unsub = unsubscribeUrl(baseUrl, doc.id);
+        await sendEmail({ to: prefs.email, subject: digest.subject, html: generateEmailHtml(digest, baseUrl, unsub), unsubscribe: unsub });
         await doc.ref.update({ lastSentAt: new Date() });
         results.sent++;
       } catch (error: any) {
@@ -130,7 +132,7 @@ async function fetchNewTrials(criteria: any, frequency: string): Promise<any[]> 
   } catch { return []; }
 }
 
-async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }) {
+async function sendEmail({ to, subject, html, unsubscribe }: { to: string; subject: string; html: string; unsubscribe?: string }) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -142,13 +144,16 @@ async function sendEmail({ to, subject, html }: { to: string; subject: string; h
       to,
       subject,
       html,
+      ...(unsubscribe
+        ? { headers: { 'List-Unsubscribe': `<${unsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } }
+        : {}),
     }),
   });
   if (!response.ok) throw new Error(`Resend error: ${await response.text()}`);
   return response.json();
 }
 
-function generateEmailHtml(digest: any, baseUrl: string): string {
+function generateEmailHtml(digest: any, baseUrl: string, unsub: string): string {
   return `
 <!DOCTYPE html>
 <html>
@@ -182,7 +187,10 @@ function generateEmailHtml(digest: any, baseUrl: string): string {
     </div>
     <div style="background:#f9fafb;padding:24px;text-align:center;border-top:1px solid #e5e7eb;">
       <p style="font-size:12px;color:#6b7280;margin:0 0 8px;">You're receiving this because you signed up for trial alerts.</p>
-      <a href="${baseUrl}/profile" style="font-size:12px;color:#0d9488;">Manage preferences</a>
+      <a href="${baseUrl}/alerts" style="font-size:12px;color:#0d9488;">Manage alerts</a>
+      <span style="font-size:12px;color:#9ca3af;"> · </span>
+      <a href="${unsub}" style="font-size:12px;color:#0d9488;">Unsubscribe</a>
+      <p style="font-size:11px;color:#9ca3af;margin:12px 0 0;">TrialMatchRX · S-n-K Elite Development · ${process.env.MAILING_ADDRESS || 'Shreveport, LA'}</p>
       <p style="font-size:11px;color:#9ca3af;margin:16px 0 0;">This is not medical advice. Always consult your healthcare provider.</p>
     </div>
   </div>

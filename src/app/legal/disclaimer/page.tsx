@@ -2,17 +2,29 @@
 
 import React from 'react';
 
-const EFFECTIVE_DATE = 'January 30, 2026';
+const EFFECTIVE_DATE = 'November 18, 2026';
 const APP_NAME = 'TrialMatchRX';
 const CONTACT_EMAIL = 'trialmatchrx@ijelany.com';
 
 export default function MedicalDisclaimerPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="bg-white shadow-sm rounded-lg p-8 sm:p-12">
+    <>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Medical Disclaimer</h1>
           <p className="text-sm text-gray-500 mb-6">Effective Date: {EFFECTIVE_DATE}</p>
+
+          <div className="mb-8 p-5 rounded-lg bg-amber-50 border border-amber-300 text-gray-800">
+            <p className="font-semibold mb-1">In plain language</p>
+            <p className="text-sm">
+              {APP_NAME} helps you find and understand clinical trials. It does not give medical advice, and it cannot
+              tell you whether a trial is right for you. Talk with your oncologist before making any decision, and
+              call 911 in an emergency.
+            </p>
+            <p className="text-sm mt-2 text-gray-600">
+              <strong>En español:</strong> {APP_NAME} le ayuda a encontrar y entender ensayos clínicos. No ofrece
+              consejos médicos ni puede decirle si un ensayo es adecuado para usted. Hable con su oncólogo antes de
+              decidir y llame al 911 en una emergencia.
+            </p>
+          </div>
 
           <div className="bg-amber-50 border-l-4 border-amber-400 p-4 mb-8 rounded-r">
             <p className="text-amber-800 font-semibold">
@@ -75,6 +87,11 @@ export default function MedicalDisclaimerPage() {
               decision-making, does not reflect the opinion of any healthcare professional, and is not
               reviewed by medical professionals before display.
             </p>
+            <p className="mt-3">
+              This includes match scores and &quot;why this matches&quot; explanations, distance estimates, plain-language
+              summaries, Spanish translations, eligibility chat answers and doctor-visit question lists. A high match
+              score does not mean you are eligible, and a low score does not mean you are not.
+            </p>
           </Section>
 
           <Section title="6. Emergency Situations">
@@ -117,9 +134,7 @@ export default function MedicalDisclaimerPage() {
               PROVIDED THROUGH THE SERVICE.
             </p>
           </Section>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
 

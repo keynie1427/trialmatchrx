@@ -31,6 +31,7 @@ import {
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import TrialAISummary from '@/components/TrialAISummary';
+import MedicalNotice from '@/components/MedicalNotice';
 import TrialEligibilityChat from '@/components/TrialEligibilityChat';
 import TrialTimeline from '@/components/TrialTimeline';
 import TrialSimilar from '@/components/TrialSimilar';
@@ -507,6 +508,8 @@ export default function TrialDetailPage() {
                   </p>
                 </motion.section>
               )}
+
+              <MedicalNotice />
 
               {/* AI-Powered Trial Summary */}
               <motion.div
