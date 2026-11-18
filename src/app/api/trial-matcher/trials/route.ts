@@ -34,6 +34,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
+import { assertSecondFactor } from '@/lib/serverMfa';
 
 
 async function verifyAdmin(req: NextRequest): Promise<string | null> {
@@ -42,6 +43,7 @@ async function verifyAdmin(req: NextRequest): Promise<string | null> {
     const app = getAdminApp();
     const token = authHeader.replace('Bearer ', '');
     const decoded = await getAdminAuth().verifyIdToken(token);
+    assertSecondFactor(decoded); // Trial Matcher requires two-step verification
     const db = getAdminDb();
     const doc = await db.collection('trial_matcher_users').doc(decoded.email!).get();
     if (!doc.exists || doc.data()?.role !== 'admin' || doc.data()?.active === false) return null;

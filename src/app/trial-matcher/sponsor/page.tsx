@@ -33,6 +33,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { checkTrialMatcherAccess, type TrialMatcherUser } from '@/lib/trialMatcherAuth';
 import { TRIALS, STATUS_CONFIG, type TrialMatcherPatient, type MatchStatus } from '@/lib/trialMatcherData';
 import { generateTrialReport } from '@/lib/trialMatcherPdf';
+import { requireSecondFactor } from '@/lib/mfa';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,9 +129,10 @@ export default function SponsorPortalPage() {
     if (authLoading) return;
     if (!user?.email) { router.replace('/login?next=/trial-matcher/sponsor'); return; }
 
-    checkTrialMatcherAccess(user.email).then(result => {
+    checkTrialMatcherAccess(user.email).then(async result => {
+      if (!result.granted) { setAccessChecking(false); router.replace('/trial-matcher/access-denied'); return; }
+      if (!(await requireSecondFactor('/trial-matcher/sponsor'))) return;
       setAccessChecking(false);
-      if (!result.granted) { router.replace('/trial-matcher/access-denied'); return; }
       if (result.user.role === 'crc' || result.user.role === 'physician' || result.user.role === 'admin') {
         // CRC/physician/admin → send to main matcher
         router.replace('/trial-matcher'); return;

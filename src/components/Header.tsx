@@ -15,7 +15,8 @@ import {
   LogOut,
   Settings,
   Bell,
-  Info
+  Info,
+  Lock
 } from 'lucide-react';
 import { useAuth, useTheme, useSavedTrials } from '@/hooks';
 import { useT, usePrefsStore } from '@/lib/i18n';
@@ -151,6 +152,15 @@ export default function Header() {
                         <Settings className="w-4 h-4" />
                         <span className="text-sm">My Profile</span>
                       </Link>
+
+                      <Link
+                        href="/account/security"
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                        onClick={() => setUserMenuOpen(false)}
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span className="text-sm">Security</span>
+                      </Link>
                       
                       <Link 
                         href="/alerts" 
@@ -247,6 +257,15 @@ export default function Header() {
                   >
                     <User className="w-5 h-5" />
                     <span>My Profile</span>
+                  </Link>
+
+                  <Link
+                    href="/account/security"
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Lock className="w-5 h-5" />
+                    <span>Security</span>
                   </Link>
                   
                   <button

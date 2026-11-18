@@ -77,7 +77,8 @@ export function useAuth() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (err: any) {
-      setError(err.message);
+      // Two-step verification isn't a failure — the login page shows the code prompt
+      if (err?.code !== 'auth/multi-factor-auth-required') setError(err.message);
       throw err;
     }
   }, []);
@@ -113,7 +114,7 @@ export function useAuth() {
         throw new Error(message);
       }
     } catch (err: any) {
-      setError(err.message);
+      if (err?.code !== 'auth/multi-factor-auth-required') setError(err.message);
       throw err;
     }
   }, []);

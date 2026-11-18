@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminApp, getAdminDb, getAdminAuth, verifyAdminRole } from '@/lib/firebaseAdmin';
 import * as XLSX from 'xlsx';
+import { assertSecondFactor } from '@/lib/serverMfa';
 
 
 async function verifyAccess(req: NextRequest): Promise<boolean> {
@@ -24,6 +25,7 @@ async function verifyAccess(req: NextRequest): Promise<boolean> {
     const app = getAdminApp();
     const token = authHeader.replace('Bearer ', '');
     const decoded = await getAdminAuth().verifyIdToken(token);
+    assertSecondFactor(decoded); // Trial Matcher requires two-step verification
     const db = getAdminDb();
     const doc = await db.collection('trial_matcher_users').doc(decoded.email!).get();
     const role = doc.data()?.role;

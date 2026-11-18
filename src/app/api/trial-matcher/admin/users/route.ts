@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminApp, getAdminDb, getAdminAuth } from '@/lib/firebaseAdmin';
+import { assertSecondFactor } from '@/lib/serverMfa';
 
 
 
@@ -17,6 +18,7 @@ async function verifyAdminToken(req: NextRequest): Promise<string | null> {
   try {
     const app = getAdminApp();
     const decoded = await getAdminAuth().verifyIdToken(token);
+    assertSecondFactor(decoded); // Trial Matcher requires two-step verification
     // Check admin role in Firestore
     const db = getAdminDb();
     const doc = await db.collection('trial_matcher_users').doc(decoded.email!).get();

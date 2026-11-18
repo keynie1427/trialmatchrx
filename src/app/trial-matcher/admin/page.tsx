@@ -38,6 +38,7 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import { useAuth } from '@/hooks/useAuth';
 import { auth } from '@/lib/firebase';
+import { requireSecondFactor } from '@/lib/mfa';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -344,8 +345,8 @@ export default function TrialMatcherAdminPage() {
     if (authLoading) return;
     if (!user?.email) { router.replace('/login?next=/trial-matcher/admin'); return; }
 
-    // Check admin role via API (reuses same whitelist check)
-    getToken().then(token =>
+    // Check admin role via API (reuses same whitelist check); admins need two-step verification
+    requireSecondFactor('/trial-matcher/admin').then(ok => ok ? getToken() : Promise.reject('mfa')).then(token =>
       fetch('/api/trial-matcher/admin/users', {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -357,7 +358,8 @@ export default function TrialMatcherAdminPage() {
         // Not admin — send to trial matcher
         router.replace('/trial-matcher');
       }
-    }).catch(() => {
+    }).catch((e) => {
+      if (e === 'mfa') return; // requireSecondFactor is redirecting
       setAccessChecking(false);
       router.replace('/trial-matcher');
     });

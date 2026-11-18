@@ -19,6 +19,7 @@ import { auth } from '@/lib/firebase';
 import { checkTrialMatcherAccess, type TrialMatcherRole, type TrialMatcherUser } from '@/lib/trialMatcherAuth';
 import { generateTrialReport, generatePatientReport } from '@/lib/trialMatcherPdf';
 import IRBLogExport from '@/components/IRBLogExport';
+import { requireSecondFactor } from '@/lib/mfa';
 import {
   PATIENTS as STATIC_PATIENTS, TRIALS, STATUS_CONFIG,
   type TrialMatcherPatient, type MatchStatus, type TrialDefinition,
@@ -784,12 +785,17 @@ export default function TrialMatcherPage() {
     if (!email) { router.replace('/trial-matcher/access-denied'); return; }
     setAccessChecking(true);
     setAccessError(null);
-    checkTrialMatcherAccess(email).then((result) => {
-      setAccessChecking(false);
+    checkTrialMatcherAccess(email).then(async (result) => {
       if (result.granted) {
         if (result.user.role === 'sponsor') { router.replace('/trial-matcher/sponsor'); return; }
+        // Trial Matcher requires two-step verification for every account
+        if (!(await requireSecondFactor('/trial-matcher'))) return;
+        setAccessChecking(false);
         setAccessUser(result.user);
-      } else if (result.reason === 'timeout' || result.reason === 'error' || result.reason === 'permission_denied') {
+        return;
+      }
+      setAccessChecking(false);
+      if (result.reason === 'timeout' || result.reason === 'error' || result.reason === 'permission_denied') {
         // Couldn't reach Firestore — show a retryable error instead of
         // spinning forever or wrongly saying access is denied.
         setAccessError(

@@ -19,6 +19,9 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { useAuth } from '@/hooks';
 import { analytics_events } from '@/lib/analytics';
+import TotpChallenge from '@/components/TotpChallenge';
+import { isMfaRequiredError, getResolver } from '@/lib/mfa';
+import type { MultiFactorResolver } from 'firebase/auth';
 
 type AuthMode = 'login' | 'waitlist' | 'forgot';
 
@@ -43,6 +46,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [waitlistSubmitting, setWaitlistSubmitting] = useState(false);
+  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(null);
+  const [mfaMethod, setMfaMethod] = useState<'password' | 'google'>('password');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,6 +80,12 @@ export default function LoginPage() {
         setSuccess('Password reset email sent! Check your inbox.');
       }
     } catch (err: any) {
+      if (isMfaRequiredError(err)) {
+        setMfaMethod('password');
+        setMfaResolver(getResolver(err));
+        setError('');
+        return;
+      }
       setError(err.message || 'An error occurred');
     } finally {
       setWaitlistSubmitting(false);
@@ -87,9 +98,36 @@ export default function LoginPage() {
       analytics_events.signIn({ method: 'google' });
       router.push(getRedirectTarget());
     } catch (err: any) {
+      if (isMfaRequiredError(err)) {
+        setMfaMethod('google');
+        setMfaResolver(getResolver(err));
+        setError('');
+        return;
+      }
       setError(err.message || 'Failed to sign in with Google');
     }
   };
+
+  if (mfaResolver) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm card p-6 sm:p-8">
+            <TotpChallenge
+              resolver={mfaResolver}
+              onSuccess={() => {
+                analytics_events.signIn({ method: mfaMethod, mfa: true } as any);
+                router.push(getRedirectTarget());
+              }}
+              onCancel={() => setMfaResolver(null)}
+            />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
