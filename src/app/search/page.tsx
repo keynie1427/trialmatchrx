@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search as SearchIcon, 
@@ -18,6 +18,28 @@ import SearchForm from '@/components/SearchForm';
 import TrialCard from '@/components/TrialCard';
 import QueryExpansion from '@/components/QueryExpansion';
 import { useTrialSearch, useAuth } from '@/hooks';
+
+// Runs a search from the URL: /search?q=free+text  or  /search?cancerType=Breast+Cancer&zip=71101
+function SearchUrlRunner() {
+  const params = useSearchParams();
+  const { search, searchWithAI } = useTrialSearch();
+  const lastRun = useRef<string>('');
+  useEffect(() => {
+    const key = params.toString();
+    if (!key || key === lastRun.current) return;
+    lastRun.current = key;
+    const q = params.get('q');
+    const cancerType = params.get('cancerType');
+    const zip = params.get('zip') || undefined;
+    const distance = params.get('distance') ? Number(params.get('distance')) : undefined;
+    if (q) {
+      searchWithAI(q, zip ? { zip, distance } : undefined);
+    } else if (cancerType) {
+      search({ cancerType, zip, distance, query: undefined });
+    }
+  }, [params, search, searchWithAI]);
+  return null;
+}
 
 export default function SearchPage() {
   const router = useRouter();
@@ -60,6 +82,9 @@ export default function SearchPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
+      <Suspense fallback={null}>
+        <SearchUrlRunner />
+      </Suspense>
 
       <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

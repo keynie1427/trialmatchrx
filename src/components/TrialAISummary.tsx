@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Info,
 } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -63,6 +64,7 @@ export default function TrialAISummary({ trial, className = '' }: TrialAISummary
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(true);
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const { lang, audience } = useT();
 
   const generateSummary = useCallback(async () => {
     if (isLoading) return;
@@ -74,7 +76,7 @@ export default function TrialAISummary({ trial, className = '' }: TrialAISummary
       const res = await fetch('/api/ai/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trial }),
+        body: JSON.stringify({ trial, language: lang, audience }),
       });
 
       if (!res.ok) {
@@ -90,7 +92,7 @@ export default function TrialAISummary({ trial, className = '' }: TrialAISummary
     } finally {
       setIsLoading(false);
     }
-  }, [trial, isLoading]);
+  }, [trial, isLoading, lang, audience]);
 
   // ── Not yet generated ────────────────────────────────────────────────────
   if (!summary && !isLoading && !error) {

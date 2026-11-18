@@ -30,6 +30,20 @@ export default function HipaaNoticePage() {
             </div>
           </Section>
 
+          <div className="mb-8 p-6 rounded-lg bg-blue-50 border border-blue-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">How we protect your information — in plain language</h2>
+            <ul className="list-disc pl-5 space-y-2 text-gray-700">
+              <li>You can search for trials without creating an account or entering your name.</li>
+              <li>Everything you send to {APP_NAME} travels over an encrypted (HTTPS/TLS) connection.</li>
+              <li>
+                If you save a profile, it is stored in Google Firebase, which encrypts data at rest, and our
+                database rules let only your signed-in account read or change it.
+              </li>
+              <li>We never sell your information, and we never share it with trial sponsors without your permission.</li>
+              <li>You can ask us to delete your saved profile and searches at any time by emailing {CONTACT_EMAIL}.</li>
+            </ul>
+          </div>
+
           <Section title="2. What is HIPAA?">
             <p>
               HIPAA is a federal law that establishes national standards for the protection of certain

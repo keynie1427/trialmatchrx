@@ -118,6 +118,13 @@ export default function SavedTrialsPage() {
                     Compare ({selectedTrials.size})
                   </Link>
                 )}
+                <Link
+                  href={`/saved/visit-prep${selectedTrials.size > 0 ? `?trials=${Array.from(selectedTrials).join(',')}` : ''}`}
+                  className="btn-secondary"
+                >
+                  <Download className="w-4 h-4" />
+                  {selectedTrials.size > 0 ? `Doctor visit sheet (${selectedTrials.size})` : 'Doctor visit sheet'}
+                </Link>
                 <button
                   onClick={() => setShowClearConfirm(true)}
                   className="btn-ghost text-red-600 dark:text-red-400"

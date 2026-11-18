@@ -13,8 +13,10 @@ import {
   MapPin,
   Clock,
   Filter,
-  User
+  User,
+  HeartHandshake
 } from 'lucide-react';
+import { useT, usePrefsStore } from '@/lib/i18n';
 import { useTrialSearch } from '@/hooks';
 import { useUserStore } from '@/lib/store';
 import { extractDemographics } from '@/lib/demographics';
@@ -47,19 +49,29 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
 
   const [prefilledFromProfile, setPrefilledFromProfile] = useState(false);
 
+  // Keep the form in sync when a search is started from the URL (e.g. /trials/[type] pages)
+  useEffect(() => {
+    if (criteria.cancerType !== undefined) setCancerType(criteria.cancerType || '');
+    if (criteria.zip !== undefined) setZip(criteria.zip || '');
+  }, [criteria.cancerType, criteria.zip]);
+  const { t, audience } = useT();
+  const setAudience = usePrefsStore((s) => s.setAudience);
+  const isCaregiver = audience === 'caregiver';
+  const zipValid = zip === '' || /^\d{5}$/.test(zip);
+
   // Pre-fill age/sex from the signed-in user's saved profile (once, and only
   // if the user hasn't already set them in this search).
   const profile = useUserStore((s) => s.profile);
   const didPrefill = useRef(false);
   useEffect(() => {
-    if (didPrefill.current || !profile) return;
+    if (didPrefill.current || !profile || isCaregiver) return;
     if (criteria.age !== undefined || criteria.sex) { didPrefill.current = true; return; }
     let filled = false;
     if (typeof profile.age === 'number' && !age) { setAge(String(profile.age)); filled = true; }
     if ((profile.sex === 'Male' || profile.sex === 'Female') && !sex) { setSex(profile.sex); filled = true; }
     didPrefill.current = true;
     if (filled) setPrefilledFromProfile(true);
-  }, [profile, criteria.age, criteria.sex, age, sex]);
+  }, [profile, criteria.age, criteria.sex, age, sex, isCaregiver]);
 
   // Live preview of age/sex detected in the AI search text
   const aiDetected = useMemo(() => extractDemographics(aiQuery), [aiQuery]);
@@ -69,7 +81,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!useAI && !ageValid) return;
+    if (!useAI && (!ageValid || !zipValid)) return;
 
     if (useAI && aiQuery.trim()) {
       // TRACK AI SEARCH
@@ -79,7 +91,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
         queryLength: aiQuery.trim().length
       });
 
-      await searchWithAI(aiQuery);
+      await searchWithAI(aiQuery, zip && zipValid ? { zip, distance } : undefined);
     } else {
       const searchCriteria: SearchCriteria = {
         cancerType: cancerType || undefined,
@@ -116,7 +128,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
     if (compact) {
       router.push('/search');
     }
-  }, [useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, parsedAge, ageValid, sex, zip, distance, search, searchWithAI, onSearch, compact, router]);
+  }, [useAI, aiQuery, cancerType, stage, selectedBiomarkers, selectedPhases, priorTreatment, parsedAge, ageValid, zipValid, sex, zip, distance, search, searchWithAI, onSearch, compact, router]);
 
   const toggleBiomarker = (biomarker: string) => {
     setSelectedBiomarkers(prev =>
@@ -156,6 +168,32 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Who is this search for? */}
+      <div>
+        <p className="flex items-center gap-2 text-sm font-medium mb-2">
+          <HeartHandshake className="w-4 h-4 text-primary-500" />
+          {t('form.who')}
+        </p>
+        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('form.who')}>
+          {(['self', 'caregiver'] as const).map((a) => (
+            <button
+              key={a}
+              type="button"
+              role="radio"
+              aria-checked={audience === a}
+              onClick={() => setAudience(a)}
+              className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                audience === a
+                  ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 ring-2 ring-primary-500'
+                  : 'bg-surface-100 dark:bg-surface-800 hover:bg-surface-200 dark:hover:bg-surface-700'
+              }`}
+            >
+              {a === 'self' ? t('form.who.self') : t('form.who.caregiver')}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* AI Search Toggle */}
       <div className="flex items-center justify-between">
         <button
@@ -172,7 +210,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
           }`}
         >
           <Sparkles className={`w-4 h-4 ${useAI ? 'animate-pulse' : ''}`} />
-          <span className="text-sm font-medium">AI Search</span>
+          <span className="text-sm font-medium">{t('form.aiSearch')}</span>
         </button>
 
         {hasFilters && (
@@ -182,7 +220,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
             className="text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300 flex items-center gap-1"
           >
             <X className="w-4 h-4" />
-            Clear all
+            {t('form.clear')}
           </button>
         )}
       </div>
@@ -203,13 +241,13 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                 type="text"
                 value={aiQuery}
                 onChange={(e) => setAiQuery(e.target.value)}
-                placeholder="Describe what you're looking for... e.g., 'Stage 4 lung cancer with EGFR mutation after Tagrisso failed'"
+                placeholder={isCaregiver ? t('form.aiPlaceholder.caregiver') : t('form.aiPlaceholder')}
                 className="input-lg pl-12 pr-4"
               />
             </div>
             {(aiDetected.age !== undefined || aiDetected.sex) && (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-surface-500">Will filter by:</span>
+                <span className="text-surface-500">{t('form.willFilter')}</span>
                 {aiDetected.age !== undefined && (
                   <span className="px-2.5 py-1 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 font-medium">
                     Age {aiDetected.age}
@@ -223,7 +261,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               </div>
             )}
             <p className="mt-2 text-sm text-surface-500">
-              Tip: Include age, sex, cancer type, stage, biomarkers, and treatment history for best results
+              {t('form.aiTip')}
             </p>
           </motion.div>
         ) : (
@@ -240,14 +278,14 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               {/* Cancer Type */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Cancer Type
+                  {isCaregiver ? t('form.cancerType.their') : t('form.cancerType')}
                 </label>
                 <select
                   value={cancerType}
                   onChange={(e) => setCancerType(e.target.value)}
                   className="select"
                 >
-                  <option value="">All cancer types</option>
+                  <option value="">{t('form.allTypes')}</option>
                   {CANCER_TYPES.map((type) => (
                     <option key={type} value={type}>{type}</option>
                   ))}
@@ -257,14 +295,14 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               {/* Stage */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Stage
+                  {t('form.stage')}
                 </label>
                 <select
                   value={stage}
                   onChange={(e) => setStage(e.target.value as CancerStage | '')}
                   className="select"
                 >
-                  <option value="">All stages</option>
+                  <option value="">{t('form.allStages')}</option>
                   {STAGES.map((s) => (
                     <option key={s} value={s}>{s}</option>
                   ))}
@@ -274,14 +312,14 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               {/* Prior Treatment */}
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Prior Treatment
+                  {t('form.prior')}
                 </label>
                 <select
                   value={priorTreatment}
                   onChange={(e) => setPriorTreatment(e.target.value)}
                   className="select"
                 >
-                  <option value="">Any treatment history</option>
+                  <option value="">{t('form.anyPrior')}</option>
                   {PRIOR_TREATMENTS.map((treatment) => (
                     <option key={treatment} value={treatment}>{treatment}</option>
                   ))}
@@ -294,7 +332,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               <div>
                 <label htmlFor="search-age" className="flex items-center gap-2 text-sm font-medium mb-2">
                   <User className="w-4 h-4 text-primary-500" />
-                  Age
+                  {isCaregiver ? t('form.age.their') : t('form.age')}
                 </label>
                 <input
                   id="search-age"
@@ -305,7 +343,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                   step={1}
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  placeholder="Any age"
+                  placeholder={t('form.anyAge')}
                   className={`input ${!ageValid ? 'ring-2 ring-red-500' : ''}`}
                   aria-invalid={!ageValid}
                 />
@@ -315,7 +353,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               </div>
               <div>
                 <label htmlFor="search-sex" className="block text-sm font-medium mb-2">
-                  Sex
+                  {t('form.sex')}
                 </label>
                 <select
                   id="search-sex"
@@ -323,21 +361,61 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                   onChange={(e) => setSex(e.target.value as 'Male' | 'Female' | '')}
                   className="select"
                 >
-                  <option value="">Any</option>
-                  <option value="Female">Female</option>
-                  <option value="Male">Male</option>
+                  <option value="">{t('form.any')}</option>
+                  <option value="Female">{t('form.female')}</option>
+                  <option value="Male">{t('form.male')}</option>
                 </select>
               </div>
             </div>
             {prefilledFromProfile && (
-              <p className="-mt-2 text-xs text-surface-500">Age and sex filled in from your profile</p>
+              <p className="-mt-2 text-xs text-surface-500">{t('form.prefilled')}</p>
             )}
+
+            {/* Location — always visible (was hidden under Advanced) */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="search-zip" className="flex items-center gap-2 text-sm font-medium mb-2">
+                  <MapPin className="w-4 h-4 text-primary-500" />
+                  {t('form.zip')}
+                </label>
+                <input
+                  id="search-zip"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="postal-code"
+                  value={zip}
+                  onChange={(e) => setZip(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                  placeholder={t('form.zipPlaceholder')}
+                  maxLength={5}
+                  className={`input ${!zipValid ? 'ring-2 ring-red-500' : ''}`}
+                  aria-invalid={!zipValid}
+                />
+                {!zipValid && <p className="mt-1 text-xs text-red-600">5 digits</p>}
+              </div>
+              <div>
+                <label htmlFor="search-distance" className="block text-sm font-medium mb-2">
+                  {t('form.distance')}
+                </label>
+                <select
+                  id="search-distance"
+                  value={distance}
+                  onChange={(e) => setDistance(Number(e.target.value))}
+                  className="select"
+                  disabled={!zip}
+                >
+                  {[25, 50, 100, 250, 500].map((m) => (
+                    <option key={m} value={m}>{t('form.within')} {m} {t('form.miles')}</option>
+                  ))}
+                  <option value={0}>{t('form.anyDistance')}</option>
+                </select>
+              </div>
+            </div>
 
             {/* Biomarkers */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium mb-3">
                 <Dna className="w-4 h-4 text-primary-500" />
-                Biomarkers
+                {t('form.biomarkers')}
               </label>
               <div className="flex flex-wrap gap-2">
                 {BIOMARKERS.slice(0, compact ? 12 : 20).map((biomarker) => (
@@ -378,7 +456,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                 className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-100"
               >
                 <Filter className="w-4 h-4" />
-                Advanced filters
+                {t('form.advanced')}
                 {showAdvanced ? (
                   <ChevronUp className="w-4 h-4" />
                 ) : (
@@ -401,7 +479,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                   <div>
                     <label className="flex items-center gap-2 text-sm font-medium mb-3">
                       <Clock className="w-4 h-4 text-primary-500" />
-                      Trial Phase
+                      {t('form.phase')}
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {PHASES.map((phase) => (
@@ -421,46 +499,9 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
                     </div>
                   </div>
 
-                  {/* Location */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                        <MapPin className="w-4 h-4 text-primary-500" />
-                        ZIP Code
-                      </label>
-                      <input
-                        type="text"
-                        value={zip}
-                        onChange={(e) => setZip(e.target.value)}
-                        placeholder="Enter ZIP code"
-                        maxLength={5}
-                        pattern="[0-9]{5}"
-                        className="input"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Distance (miles)
-                      </label>
-                      <select
-                        value={distance}
-                        onChange={(e) => setDistance(Number(e.target.value))}
-                        className="select"
-                        disabled={!zip}
-                      >
-                        <option value={25}>Within 25 miles</option>
-                        <option value={50}>Within 50 miles</option>
-                        <option value={100}>Within 100 miles</option>
-                        <option value={250}>Within 250 miles</option>
-                        <option value={500}>Within 500 miles</option>
-                        <option value={0}>Any distance</option>
-                      </select>
-                    </div>
-                  </div>
-
                   {/* All Biomarkers */}
                   <div>
-                    <label className="text-sm font-medium mb-3 block">All Biomarkers</label>
+                    <label className="text-sm font-medium mb-3 block">{t('form.allBiomarkers')}</label>
                     <div className="max-h-48 overflow-y-auto p-3 rounded-xl bg-surface-50 dark:bg-surface-900 border border-surface-200 dark:border-surface-700">
                       <div className="flex flex-wrap gap-2">
                         {BIOMARKERS.map((biomarker) => (
@@ -490,7 +531,7 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={isLoading || (!useAI && !ageValid)}
+        disabled={isLoading || (!useAI && (!ageValid || !zipValid))}
         className="btn-primary w-full py-4 text-lg"
       >
         {isLoading ? (
@@ -499,12 +540,12 @@ export default function SearchForm({ onSearch, compact = false }: SearchFormProp
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            Searching...
+            {t('form.searching')}
           </span>
         ) : (
           <span className="flex items-center gap-2">
             <Search className="w-5 h-5" />
-            Search Trials
+            {t('form.submit')}
           </span>
         )}
       </button>

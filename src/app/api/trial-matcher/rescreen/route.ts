@@ -314,8 +314,22 @@ export async function POST(req: NextRequest) {
 
 // ─── GET — return current notifications for the dashboard ─────────────────────
 
+// Vercel Cron calls routes with GET (sending "Authorization: Bearer $CRON_SECRET").
+// This forwards a cron GET to the POST handler with an empty JSON body.
+function cronToPost(req: NextRequest, body: Record<string, unknown> = {}) {
+  return new NextRequest(req.url, {
+    method: 'POST',
+    headers: req.headers,
+    body: JSON.stringify(body),
+  });
+}
+
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization') || '';
+  // Vercel Cron (vercel.json) uses GET with the cron secret → run the re-screen
+  if (process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`) {
+    return POST(cronToPost(req));
+  }
   try {
     const app = getAdminApp();
     const { getAuth } = await import('firebase-admin/auth');

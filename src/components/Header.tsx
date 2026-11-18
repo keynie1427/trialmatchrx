@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -14,9 +14,34 @@ import {
   Sparkles,
   LogOut,
   Settings,
-  Bell
+  Bell,
+  Info
 } from 'lucide-react';
 import { useAuth, useTheme, useSavedTrials } from '@/hooks';
+import { useT, usePrefsStore } from '@/lib/i18n';
+
+function LanguageToggle({ className = '' }: { className?: string }) {
+  const { lang } = useT();
+  const setLang = usePrefsStore((s) => s.setLang);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+  return (
+    <div className={`flex items-center rounded-lg bg-surface-100 dark:bg-surface-800 p-0.5 text-xs font-semibold ${className}`} role="group" aria-label="Language">
+      {(['en', 'es'] as const).map((l) => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => setLang(l)}
+          aria-pressed={lang === l}
+          className={`px-2 py-1 rounded-md transition-colors ${lang === l ? 'bg-white dark:bg-surface-700 shadow-sm text-primary-700 dark:text-primary-300' : 'text-surface-500 hover:text-surface-800 dark:hover:text-surface-200'}`}
+        >
+          {l === 'en' ? 'EN' : 'ES'}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function Header() {
   const { user, isAuthenticated, signOut } = useAuth();
@@ -24,6 +49,7 @@ export default function Header() {
   const { savedTrials } = useSavedTrials();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const { t } = useT();
 
   return (
     <header className="sticky top-0 z-50 glass">
@@ -40,13 +66,13 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-1 whitespace-nowrap">
             <Link 
               href="/search" 
               className="btn-ghost text-sm"
             >
               <Search className="w-4 h-4" />
-              Search Trials
+              {t('nav.search')}
             </Link>
             
             <Link 
@@ -54,7 +80,7 @@ export default function Header() {
               className="btn-ghost text-sm relative"
             >
               <Bookmark className="w-4 h-4" />
-              Saved
+              {t('nav.saved')}
               {savedTrials.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-secondary-500 text-white text-xs flex items-center justify-center">
                   {savedTrials.length}
@@ -69,6 +95,13 @@ export default function Header() {
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
               CRC Trial Matcher
             </Link>
+
+            <Link href="/about" className="btn-ghost text-sm">
+              <Info className="w-4 h-4" />
+              {t('nav.about')}
+            </Link>
+
+            <LanguageToggle className="mx-1" />
 
             {/* Theme Toggle */}
             <button
@@ -151,7 +184,7 @@ export default function Header() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden btn-ghost p-2"
+            className="lg:hidden btn-ghost p-2"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (
@@ -171,7 +204,7 @@ export default function Header() {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="md:hidden border-t border-surface-200 dark:border-surface-800"
+            className="lg:hidden border-t border-surface-200 dark:border-surface-800"
           >
             <div className="px-4 py-4 space-y-2">
               <Link 
@@ -180,7 +213,16 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <Search className="w-5 h-5" />
-                <span>Search Trials</span>
+                <span>{t('nav.search')}</span>
+              </Link>
+
+              <Link
+                href="/about"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Info className="w-5 h-5" />
+                <span>{t('nav.about')}</span>
               </Link>
               
               <Link 
@@ -228,7 +270,8 @@ export default function Header() {
               )}
 
               <div className="flex items-center justify-between px-4 py-3 border-t border-surface-200 dark:border-surface-800 mt-4">
-                <span className="text-sm text-surface-500">Theme</span>
+                <LanguageToggle />
+                <span className="text-sm text-surface-500 ml-auto mr-2">Theme</span>
                 <button
                   onClick={() => setTheme(isDark ? 'light' : 'dark')}
                   className="btn-ghost p-2"

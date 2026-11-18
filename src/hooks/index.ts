@@ -16,7 +16,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { getUser, createUser, updateUserProfile, getTrial } from '@/lib/firestore';
 import { useUserStore, useSearchStore, useSavedTrialsStore, useUIStore } from '@/lib/store';
-import type { PatientProfile, SearchCriteria, SearchResult, Trial, TrialPhase } from '@/types';
+import type { PatientProfile, SearchCriteria, SearchResult, Trial, TrialPhase, MatchReason } from '@/types';
 import { extractDemographics } from '@/lib/demographics';
 
 // =============================================================================
@@ -205,11 +205,15 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
     params.set('filter.advanced', advancedFilter);
   }
 
-  // Add location filtering - search by state from zip code
+  // Location: geocode the ZIP once, then let ClinicalTrials.gov filter by
+  // radius (filter.geo). Falls back to a state-level filter if geocoding fails.
+  const userCoords = criteria.zip ? await getZipCoordinates(criteria.zip) : null;
   if (criteria.zip) {
-    const state = await getStateFromZip(criteria.zip);
-    if (state) {
-      params.set('query.locn', `United States, ${state}`);
+    if (userCoords && criteria.distance && criteria.distance > 0) {
+      params.set('filter.geo', `distance(${userCoords.lat},${userCoords.lon},${criteria.distance}mi)`);
+    } else if (!userCoords) {
+      const state = await getStateFromZip(criteria.zip);
+      if (state) params.set('query.locn', `United States, ${state}`);
     }
   }
   
@@ -247,7 +251,7 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
     const stages = extractStages(eligibilityText, conditions.conditions || []);
     
     // Get locations with coordinates if available
-    const locations = (contacts.locations || []).slice(0, 50).map((loc: any) => ({
+    const locations = (contacts.locations || []).map((loc: any) => ({
       facility: loc.facility || 'Unknown',
       city: loc.city || '',
       state: loc.state || '',
@@ -308,10 +312,8 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
   trials = trials.filter(trial => isEligibleByDemographics(trial, criteria));
   const removedByDemographics = preFilterCount - trials.length;
 
-  // Filter by distance if zip code provided
-  if (criteria.zip && criteria.distance && criteria.distance > 0) {
-    const userCoords = await getZipCoordinates(criteria.zip);
-    
+  // Nearest-site distance whenever a ZIP is provided; radius filter only when set
+  if (criteria.zip) {
     if (userCoords) {
       trials = trials.map(trial => {
         // Find nearest location
@@ -342,6 +344,10 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
           }
         }
         
+        if (nearestDistance === Infinity) {
+          return { ...trial, nearestDistance: undefined };
+        }
+
         // Reorder locations to put nearest first
         if (nearestLocationIndex > 0 && (trial.locations ?? []).length > 0) {
           const nearestLoc = trial.locations[nearestLocationIndex];
@@ -356,10 +362,12 @@ async function searchClinicalTrialsGov(criteria: SearchCriteria): Promise<{ tria
         return { ...trial, nearestDistance };
       });
       
-      // Filter by distance
-      trials = trials.filter((trial: any) => 
-        trial.nearestDistance <= (criteria.distance || 100)
-      );
+      // Filter by distance (0 / unset = any distance)
+      if (criteria.distance && criteria.distance > 0) {
+        trials = trials.filter((trial: any) =>
+          trial.nearestDistance <= criteria.distance!
+        );
+      }
       
       // Sort by distance
       trials.sort((a: any, b: any) => 
@@ -529,7 +537,32 @@ async function getStateFromZip(zip: string): Promise<string | null> {
   return ZIP_TO_STATE[prefix] || null;
 }
 
+const zipCoordCache = new Map<string, { lat: number; lon: number } | null>();
+
 async function getZipCoordinates(zip: string): Promise<{ lat: number; lon: number } | null> {
+  if (zipCoordCache.has(zip)) return zipCoordCache.get(zip)!;
+  // Precise centroid for the exact ZIP (server route, cached 30 days)
+  if (/^\d{5}$/.test(zip)) {
+    try {
+      const res = await fetch(`/api/geo/zip?zip=${zip}`);
+      if (res.ok) {
+        const d = await res.json();
+        if (Number.isFinite(d.lat) && Number.isFinite(d.lon)) {
+          const coords = { lat: d.lat, lon: d.lon };
+          zipCoordCache.set(zip, coords);
+          return coords;
+        }
+      }
+    } catch {
+      /* fall through to the approximate table */
+    }
+  }
+  const approx = getApproxZipCoordinates(zip);
+  zipCoordCache.set(zip, approx);
+  return approx;
+}
+
+function getApproxZipCoordinates(zip: string): { lat: number; lon: number } | null {
   const prefix = zip.substring(0, 3);
   
   // Check if we have exact coordinates for this prefix
@@ -692,24 +725,171 @@ function normalizeConditions(conditions: string[]): string[] {
   return Array.from(normalized);
 }
 
-function calculateMatchScore(trial: Trial & { nearestDistance?: number }, criteria: SearchCriteria): number {
-  let score = 50;
-  if (criteria.cancerType && (trial.conditionsNormalized ?? []).some(c => c.toLowerCase().includes(criteria.cancerType!.toLowerCase()))) score += 20;
-  if (criteria.stage && (trial.stages ?? []).includes(criteria.stage)) score += 10;
-  if (criteria.biomarkers && criteria.biomarkers.length > 0) {
-    const matched = criteria.biomarkers.filter(b => (trial.biomarkers ?? []).includes(b));
-    score += (matched.length / criteria.biomarkers.length) * 15;
+// ── Match explanation helpers ───────────────────────────────────────────────
+function normText(t: string) {
+  return (t || '').toLowerCase().replace(/[\s\-_]+/g, ' ');
+}
+
+function trialText(trial: Trial) {
+  return normText([
+    trial.title,
+    trial.officialTitle,
+    ...(trial.conditions ?? []),
+    trial.eligibilityCriteria,
+  ].filter(Boolean).join(' '));
+}
+
+function mentions(text: string, term: string) {
+  return text.includes(normText(term));
+}
+
+const STAGE_SYNONYMS: Record<string, string[]> = {
+  'Stage 0': ['stage 0', 'in situ'],
+  'Stage I': ['early stage'],
+  'Stage II': ['early stage'],
+  'Stage III': ['stage iii', 'stage 3', 'locally advanced'],
+  'Stage IV': ['stage iv', 'stage 4', 'metastatic', 'advanced'],
+  'Metastatic': ['metastatic', 'stage iv', 'stage 4', 'advanced'],
+  'Locally Advanced': ['locally advanced', 'stage iii', 'unresectable'],
+  'Recurrent': ['recurrent', 'relapsed'],
+  'Refractory': ['refractory', 'resistant'],
+  'Unresectable': ['unresectable', 'inoperable'],
+};
+
+const STAGE_REGEX: Record<string, RegExp> = {
+  'Stage I': /\bstage (i|1)[abc]?\b/,
+  'Stage II': /\bstage (ii|2)[abc]?\b/,
+  'Stage III': /\bstage (iii|3)[abc]?\b/,
+  'Stage IV': /\bstage (iv|4)[abc]?\b/,
+};
+
+function stageMatches(_trial: Trial, stage: string, text: string) {
+  if (STAGE_REGEX[stage]?.test(text)) return true;
+  return (STAGE_SYNONYMS[stage] || [stage.toLowerCase()]).some((s) => text.includes(s));
+}
+
+function fmtAgeRange(min?: number, max?: number) {
+  const r = (n: number) => (n < 1 ? '<1' : String(Math.round(n)));
+  if (min !== undefined && max !== undefined) return `ages ${r(min)}–${r(max)}`;
+  if (min !== undefined) return `ages ${r(min)}+`;
+  if (max !== undefined) return `up to age ${r(max)}`;
+  return 'no age limit listed';
+}
+
+/** Concrete, per-criterion explanation of a match. Matched items show ✓, missing ones ⚠. */
+function buildMatchReasons(trial: Trial & { nearestDistance?: number }, criteria: SearchCriteria): MatchReason[] {
+  const text = trialText(trial);
+  const reasons: MatchReason[] = [];
+
+  if (criteria.cancerType) {
+    const ok = mentions(text, criteria.cancerType) ||
+      (trial.conditionsNormalized ?? []).some((c) => c.toLowerCase().includes(criteria.cancerType!.toLowerCase()));
+    reasons.push({
+      factor: `Cancer type: ${criteria.cancerType}`,
+      weight: 10,
+      matched: ok,
+      details: ok
+        ? `Studies ${(trial.conditions ?? []).slice(0, 2).join(', ') || criteria.cancerType}`
+        : `Listed conditions: ${(trial.conditions ?? []).slice(0, 2).join(', ') || 'not specified'}`,
+    });
   }
-  if ((trial.phase ?? '').includes('3')) score += 5;
-  if (trial.status === 'Recruiting') score += 5;
-  
-  // Bonus for nearby trials
+
+  if (criteria.stage) {
+    const ok = stageMatches(trial, criteria.stage, text);
+    reasons.push({
+      factor: `Stage: ${criteria.stage}`,
+      weight: 8,
+      matched: ok,
+      details: ok ? 'Eligibility mentions this stage' : 'Stage not mentioned — ask the study team if it applies',
+    });
+  }
+
+  for (const b of criteria.biomarkers ?? []) {
+    const mentioned = mentions(text, b) || (trial.biomarkers ?? []).includes(b);
+    // "KRAS wild-type" / "KRAS/NRAS ... wild type" / "EGFR negative" means the
+    // trial wants patients WITHOUT that alteration — not a match.
+    const gene = normText(b).split(' ')[0].replace(/[^a-z0-9]/g, '');
+    const wildType = mentioned && gene.length >= 2 && !/-$/.test(b) && new RegExp(
+      `\\b${gene}\\b[^.;\\n]{0,40}\\b(wild ?type|wt|negative|non ?mutated|without (a |an )?mutation)\\b|\\b(wild ?type|wt)\\b[^.;\\n]{0,15}\\b${gene}\\b`
+    ).test(text);
+    reasons.push({
+      factor: `Biomarker: ${b}`,
+      weight: 8,
+      matched: mentioned && !wildType,
+      details: wildType
+        ? `Trial appears to require ${gene.toUpperCase()} wild-type (no alteration) — may exclude you`
+        : mentioned ? 'Mentioned in the eligibility criteria' : 'Not mentioned — the trial may not target it',
+    });
+  }
+
+  if (criteria.priorTreatment && criteria.priorTreatment !== 'Treatment-naïve') {
+    const term = criteria.priorTreatment.toLowerCase();
+    const excluded = new RegExp(`no (prior|previous) ${term}`).test(text);
+    const ok = !excluded && text.includes(term);
+    reasons.push({
+      factor: `Prior treatment: ${criteria.priorTreatment}`,
+      weight: 6,
+      matched: ok,
+      details: excluded
+        ? 'Criteria say no prior ' + term + ' — likely not eligible'
+        : ok ? 'Eligibility addresses prior ' + term : 'Not addressed — confirm with the study team',
+    });
+  } else if (criteria.priorTreatment === 'Treatment-naïve') {
+    reasons.push({
+      factor: 'Treatment-naïve',
+      weight: 6,
+      matched: !!trial.treatmentNaive,
+      details: trial.treatmentNaive ? 'Open to people who have not been treated yet' : 'Does not say it accepts untreated patients',
+    });
+  }
+
+  if (criteria.age !== undefined || criteria.sex) {
+    const e = trial.eligibilityParsed;
+    const sexText = !e?.sex || e.sex === 'All' ? 'all sexes' : `${e.sex.toLowerCase()} only`;
+    reasons.push({
+      factor: 'Age & sex eligibility',
+      weight: 9,
+      matched: isEligibleByDemographics(trial, criteria),
+      details: `Accepts ${fmtAgeRange(e?.minAge, e?.maxAge)}, ${sexText}`,
+    });
+  }
+
+  if (criteria.zip) {
+    const d = trial.nearestDistance;
+    const near = trial.locations?.[0];
+    const ok = d !== undefined && (!criteria.distance || d <= criteria.distance);
+    reasons.push({
+      factor: 'Location',
+      weight: 7,
+      matched: ok,
+      details: d !== undefined && near
+        ? `Nearest site: ${[near.city, near.state].filter(Boolean).join(', ')} — about ${Math.round(d)} miles`
+        : 'Site distances not available',
+    });
+  }
+
+  reasons.push({
+    factor: 'Currently recruiting',
+    weight: 5,
+    matched: trial.status === 'Recruiting',
+    details: trial.status,
+  });
+
+  return reasons;
+}
+
+function calculateMatchScore(trial: Trial & { nearestDistance?: number }, criteria: SearchCriteria, reasons?: MatchReason[]): number {
+  const rs = reasons ?? buildMatchReasons(trial, criteria);
+  // Base 40, then weighted share of the criteria the person actually gave us.
+  const total = rs.reduce((a, r) => a + r.weight, 0);
+  const got = rs.reduce((a, r) => a + (r.matched ? r.weight : 0), 0);
+  let score = 40 + (total ? (got / total) * 50 : 0);
+  if ((trial.phase ?? '').includes('3')) score += 4;
   if (trial.nearestDistance !== undefined) {
-    if (trial.nearestDistance < 25) score += 10;
-    else if (trial.nearestDistance < 50) score += 5;
+    if (trial.nearestDistance < 25) score += 6;
+    else if (trial.nearestDistance < 50) score += 4;
     else if (trial.nearestDistance < 100) score += 2;
   }
-  
   return Math.min(Math.round(score), 100);
 }
 
@@ -739,20 +919,15 @@ export function useTrialSearch() {
       const total = response?.total ?? 0;
       
       // Calculate match scores
-      const searchResults: SearchResult[] = trials.map((trial: any) => ({
-        trial,
-        matchScore: calculateMatchScore(trial, finalCriteria),
-        matchReasons: [
-          { factor: 'Cancer Type', weight: 10, matched: !!finalCriteria.cancerType && (trial.conditions ?? []).some((c: string) => c.toLowerCase().includes(finalCriteria.cancerType!.toLowerCase())) },
-          { factor: 'Recruiting Status', weight: 10, matched: trial.status === 'Recruiting' },
-          { factor: 'Biomarkers', weight: 8, matched: (finalCriteria.biomarkers || []).some((b: string) => (trial.biomarkers ?? []).includes(b)) },
-          ...(finalCriteria.age !== undefined || finalCriteria.sex
-            ? [{ factor: 'Age & Sex Eligibility', weight: 9, matched: true }]
-            : []),
-          { factor: 'Location', weight: 7, matched: trial.nearestDistance !== undefined && trial.nearestDistance < (finalCriteria.distance || 100) },
-        ],
-        distance: trial.nearestDistance,
-      }));
+      const searchResults: SearchResult[] = trials.map((trial: any) => {
+        const matchReasons = buildMatchReasons(trial, finalCriteria);
+        return {
+          trial,
+          matchScore: calculateMatchScore(trial, finalCriteria, matchReasons),
+          matchReasons,
+          distance: trial.nearestDistance,
+        };
+      });
       
       // Sort by match score
       searchResults.sort((a, b) => b.matchScore - a.matchScore);
@@ -766,7 +941,7 @@ export function useTrialSearch() {
     }
   }, [criteria, setCriteria, setResults, setSearching, setError]);
 
-  const searchWithAI = useCallback(async (query: string) => {
+  const searchWithAI = useCallback(async (query: string, extra?: Partial<SearchCriteria>) => {
     // For now, do a simple keyword search
     // AI parsing would require Cloud Functions
     setSearching(true);
@@ -776,7 +951,18 @@ export function useTrialSearch() {
       // Pull age/sex out of the text so they become real eligibility filters
       // instead of keywords (keys are always set so stale values are cleared).
       const { age, sex, cleanedQuery } = extractDemographics(query);
-      const simpleCriteria: Partial<SearchCriteria> = { query: cleanedQuery, age, sex };
+      const simpleCriteria: Partial<SearchCriteria> = {
+        query: cleanedQuery,
+        age,
+        sex,
+        // AI search replaces structured filters, but keeps the location
+        cancerType: undefined,
+        stage: undefined,
+        biomarkers: undefined,
+        priorTreatment: undefined,
+        zip: extra?.zip,
+        distance: extra?.distance,
+      };
       await search(simpleCriteria);
     } catch (err: any) {
       setError(err.message);

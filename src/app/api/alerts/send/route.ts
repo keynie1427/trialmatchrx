@@ -16,6 +16,22 @@ if (getApps().length === 0) {
   }
 }
 
+// Vercel Cron calls routes with GET (sending "Authorization: Bearer $CRON_SECRET").
+// This forwards a cron GET to the POST handler with an empty JSON body.
+function cronToPost(req: NextRequest, body: Record<string, unknown> = {}) {
+  return new NextRequest(req.url, {
+    method: 'POST',
+    headers: req.headers,
+    body: JSON.stringify(body),
+  });
+}
+
+// GET /api/alerts/send?frequency=weekly — invoked by Vercel Cron (vercel.json)
+export async function GET(request: NextRequest) {
+  const frequency = request.nextUrl.searchParams.get('frequency') || 'weekly';
+  return POST(cronToPost(request, { frequency }));
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');

@@ -21,7 +21,7 @@ export default function Footer() {
               to your cancer type, stage, biomarkers, and treatment history.
             </p>
             <p className="text-surface-500 text-xs mt-4">
-              Clinical trial data sourced from ClinicalTrials.gov. Proprietary analysis,
+              Clinical trial data sourced live from ClinicalTrials.gov (U.S. National Library of Medicine). Proprietary analysis,
               scoring logic, and summaries are the intellectual property of TrialMatchRX.
             </p>
           </div>
@@ -48,6 +48,26 @@ export default function Footer() {
               <li>
                 <Link href="/how-it-works" className="text-sm text-surface-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
                   How It Works
+                </Link>
+              </li>
+              <li>
+                <Link href="/trials" className="text-sm text-surface-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                  Trials by Cancer Type
+                </Link>
+              </li>
+              <li>
+                <Link href="/technology" className="text-sm text-surface-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                  Our Matching Technology
+                </Link>
+              </li>
+              <li>
+                <Link href="/about" className="text-sm text-surface-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link href="/for-research-sites" className="text-sm text-surface-600 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                  For Research Sites
                 </Link>
               </li>
             </ul>
@@ -104,7 +124,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="mt-8 pt-6 border-t border-surface-200 dark:border-surface-800 flex items-center justify-center">
           <p className="text-sm text-surface-500">
-            © {new Date().getFullYear()} TrialMatchRX. All rights reserved.
+            © {new Date().getFullYear()} TrialMatchRX, an S-n-K Elite Development platform. All rights reserved.
           </p>
         </div>
 

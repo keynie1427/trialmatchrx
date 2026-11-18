@@ -106,6 +106,21 @@ function parseCtStudy(data: any, colorIdx: number) {
   };
 }
 
+// Vercel Cron calls routes with GET (sending "Authorization: Bearer $CRON_SECRET").
+// This forwards a cron GET to the POST handler with an empty JSON body.
+function cronToPost(req: NextRequest, body: Record<string, unknown> = {}) {
+  return new NextRequest(req.url, {
+    method: 'POST',
+    headers: req.headers,
+    body: JSON.stringify(body),
+  });
+}
+
+// GET — invoked by Vercel Cron (vercel.json); cron secret required
+export async function GET(req: NextRequest) {
+  return POST(cronToPost(req));
+}
+
 export async function POST(req: NextRequest) {
   const hasAccess = await verifyAccess(req);
   if (!hasAccess) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

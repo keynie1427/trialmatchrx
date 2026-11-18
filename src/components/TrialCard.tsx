@@ -22,6 +22,7 @@ import {
   BadgeCheck
 } from 'lucide-react';
 import { useSavedTrials } from '@/hooks';
+import { useT } from '@/lib/i18n';
 import { findMatchingTherapies, getNciDrugUrl, getFdaDrugUrl } from '@/lib/fda-therapies';
 import type { Trial, SearchResult, MatchReason } from '@/types';
 
@@ -37,6 +38,11 @@ export default function TrialCard({ result, showMatchReasons = true, compact = f
   const [expanded, setExpanded] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
   const saved = isSaved(trial.nctId);
+  const { t, lang } = useT();
+  // Criteria the person actually supplied (exclude the always-present "recruiting" line)
+  const personal = (matchReasons ?? []).filter((r) => r.factor !== 'Currently recruiting');
+  const metCount = personal.filter((r) => r.matched).length;
+  const unmet = personal.filter((r) => !r.matched);
 
   const getScoreColor = (score: number) => {
     if (score >= 75) return 'match-score-high';
@@ -360,13 +366,24 @@ export default function TrialCard({ result, showMatchReasons = true, compact = f
                 className="flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
               >
                 <Sparkles className="w-4 h-4" />
-                Why this matches
+                {t('card.why')}
+                {personal.length > 0 && (
+                  <span className="text-surface-500 font-normal">
+                    {' '}— {metCount}/{personal.length} {lang === 'es' ? 'de sus criterios' : 'of your criteria met'}
+                  </span>
+                )}
                 {expanded ? (
                   <ChevronUp className="w-4 h-4" />
                 ) : (
                   <ChevronDown className="w-4 h-4" />
                 )}
               </button>
+              {!expanded && unmet.length > 0 && (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  {lang === 'es' ? 'Revisar:' : 'Check:'} {unmet.map((r) => r.factor.replace(/^[^:]+:\s*/, '')).join(', ')}
+                </p>
+              )}
 
               {expanded && (
                 <motion.div
@@ -389,7 +406,7 @@ export default function TrialCard({ result, showMatchReasons = true, compact = f
               href={`/trial/${trial.nctId}`}
               className="btn-primary text-sm py-2"
             >
-              View Details
+              {t('card.details')}
             </Link>
             <a
               href={`https://clinicaltrials.gov/study/${trial.nctId}`}

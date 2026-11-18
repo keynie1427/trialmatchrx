@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 // POST /api/ai/summarize
 export async function POST(request: NextRequest) {
   try {
-    const { trial } = await request.json();
+    const { trial, language, audience } = await request.json();
+    const lang: 'en' | 'es' = language === 'es' ? 'es' : 'en';
+    const isCaregiver = audience === 'caregiver';
 
     if (!trial || !trial.nctId) {
       return NextResponse.json(
@@ -39,7 +41,14 @@ export async function POST(request: NextRequest) {
             content: trialContext,
           },
         ],
-        system: SYSTEM_PROMPT,
+        system:
+          SYSTEM_PROMPT +
+          (lang === 'es'
+            ? '\n\nLANGUAGE: Write every string value in clear, warm, everyday Spanish (Latin American, neutral). Keep the JSON keys in English exactly as shown. Keep drug names and NCT IDs unchanged.'
+            : '') +
+          (isCaregiver
+            ? '\n\nAUDIENCE: The reader is a family member or caregiver researching this trial for someone else. Refer to the patient as "your loved one" (Spanish: "su ser querido") rather than "you", and include anything a caregiver would need to plan for (travel, visit frequency, time commitment).'
+            : ''),
       }),
     });
 
